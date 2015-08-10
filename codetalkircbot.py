@@ -79,7 +79,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
     def handle_error(self, error):
         l.error("failed to fetch data; {0}", dict(error._asdict()))
 
-    def poll_loop(self, min_sleep=1):
+    def poll_loop(self, sleep=1):
         l.info("poll loop initiated")
 
         i = 1
@@ -87,19 +87,13 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             l.debug("poll #{}", i)
             i = i + 1
 
-            starttime = time.time()
-            # Long polling, but additionally delay because the requests usually takes only 0.15s
+            # Long polling
             self.get_updates(
-                timeout=min_sleep,
+                timeout=sleep,
                 offset=self.offset,
                 callback=self.handle_updates,  # on_succes=
                 on_error=self.handle_error
             ).wait()
-
-            sleep = max(0, min_sleep - (time.time() - starttime))
-            if sleep:
-                l.debug("sleeping for {:.3}s", float(sleep))
-                time.sleep(sleep)
 
 
 def main():
