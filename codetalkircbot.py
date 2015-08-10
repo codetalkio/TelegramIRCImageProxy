@@ -2,14 +2,12 @@
 
 from functools import partial
 import logging
-import time
 import sys
-# import threading
 
 from twx import botapi
+import yaml
 
-TOKEN = ""
-SLEEP = 5
+CONFIG_FILE = "config.yaml"
 
 
 def init_logging():
@@ -18,6 +16,8 @@ def init_logging():
             msg = self.msg
             if not isinstance(self.msg, str):
                 msg = str(self.msg)
+            if not isinstance(self.args, tuple):
+                self.args = (self.args,)
             return msg.format(*self.args)
     logging.setLogRecordFactory(NewStyleLogRecord)
 
@@ -104,13 +104,18 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
 
 def main():
     msg = "logging level: {}".format(l.getEffectiveLevel())
-    print(msg)
-    l.info(msg)
+    l.error(msg)
 
-    bot = CodetalkIRCBot_Telegram(token=TOKEN)
+    # Read config
+    l.debug("config file: '{}'", CONFIG_FILE)
+    with open(CONFIG_FILE) as f:
+        config = yaml.safe_load(f)
+    l.debug("config: {!s}", config)
+
+    bot = CodetalkIRCBot_Telegram(token=config['token'])
     l.info("Me: {}", bot.update_bot_info().wait())
 
-    bot.poll_loop(SLEEP)
+    bot.poll_loop(config['sleep'])
 
 
 if __name__ == '__main__':
