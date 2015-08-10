@@ -106,6 +106,10 @@ def main():
         config = yaml.safe_load(f)
     l.debug("config: {!s}", config)
 
+    if 'token' not in config or not config['token']:
+        l.error("no token found in config")
+        return 1
+
     bot = CodetalkIRCBot_Telegram(token=config['token'])
     l.info("Me: {}", bot.update_bot_info().wait())
 
@@ -113,4 +117,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

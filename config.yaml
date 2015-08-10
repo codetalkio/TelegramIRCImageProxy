@@ -1,5 +1,5 @@
 %YAML 1.2
 ---
-token:
+token:  # obtain from @BotFather (https://telegram.me/BotFather)
 sleep: 5
 ...
