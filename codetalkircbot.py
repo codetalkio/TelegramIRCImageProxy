@@ -34,6 +34,53 @@ init_logging()
 l = logging.getLogger(__name__)
 
 
+##############################################################################
+
+
+def preprocess_stack(items):
+    return [(item[1], item[2], item[3], item[4][-1])
+            for item in items]
+
+
+def replace_with_type(type_, replace_type, data):
+    if isinstance(data, type_):
+        return replace_type(data)
+    return data
+
+
+class Config(dict):
+
+    def __init__(self, items=None):
+        if items is not None:
+            if hasattr(items, 'items'):
+                items = list(items.items())
+            for i, (k, v) in enumerate(items):
+                items[i] = (k, replace_with_type(dict, Config, v))
+            super().__init__(items)
+        else:
+            super().__init__()
+
+    def __getattr__(self, key):
+        if key in self:
+            return self[key]
+        else:
+            l.warn("AttrDict: did not find key '{}' in keys {}", key, self.keys())
+
+            if l.getEffectiveLevel() <= logging.INFO:
+                import inspect
+                stack = inspect.stack(1)[1:]
+                l.info("-- AttrDict stack --")
+                for info in reversed(stack):
+                    l.info('  File "{0[1]}", line {0[2]}, in {0[3]} -- {1}',
+                           info, info[4][-1].strip())
+                l.info("-- AttrDict stack -- end")
+
+            return Config()  # return empty 'dict' as default
+
+
+##############################################################################
+
+
 class CodetalkIRCBot_Telegram(botapi.TelegramBot):
 
     def __init__(self, *args, **kwargs):
@@ -79,8 +126,8 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
     def handle_error(self, error):
         l.error("failed to fetch data; {0}", dict(error._asdict()))
 
-    def poll_loop(self, sleep=1):
-        l.info("poll loop initiated")
+    def poll_loop(self, sleep):
+        l.info("poll loop initiated with sleep {}", sleep)
 
         i = 1
         while True:
@@ -96,6 +143,9 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             ).wait()
 
 
+##############################################################################
+
+
 def main():
     msg = "logging level: {}".format(l.getEffectiveLevel())
     l.error(msg)
@@ -103,17 +153,17 @@ def main():
     # Read config
     l.debug("config file: '{}'", CONFIG_FILE)
     with open(CONFIG_FILE) as f:
-        config = yaml.safe_load(f)
+        config = Config(yaml.safe_load(f))
     l.debug("config: {!s}", config)
 
-    if 'token' not in config or not config['token']:
+    if not config.telegram.token:
         l.error("no token found in config")
-        return 1
+        return 2
 
-    bot = CodetalkIRCBot_Telegram(token=config['token'])
+    bot = CodetalkIRCBot_Telegram(token=config.telegram.token)
     l.info("Me: {}", bot.update_bot_info().wait())
 
-    bot.poll_loop(config['sleep'])
+    bot.poll_loop(config.telegram.sleep or 1)
 
 
 if __name__ == '__main__':
