@@ -20,20 +20,22 @@ def init_logging():
             return msg.format(*self.args)
     logging.setLogRecordFactory(NewStyleLogRecord)
 
-    fmt = logging.Formatter("| {levelname:^8} | {message} (from {name})", style='{')
+    fmt = logging.Formatter("| {levelname:^8} | {message} (from {name})",
+                            style='{')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(fmt)
     # Filter out requests logging, for now
-    handler.addFilter(lambda r: (not r.name.startswith("requests")) or r.levelno > 20)
+    handler.addFilter(
+        lambda r: (not r.name.startswith("requests")) or r.levelno > 20
+    )
 
-    # TODO filter for requests
     logging.basicConfig(level=logging.DEBUG, handlers=[handler])
 
 init_logging()
 l = logging.getLogger(__name__)
 
 
-##############################################################################
+###############################################################################
 
 
 class CodetalkIRCBot_Telegram(botapi.TelegramBot):
@@ -84,10 +86,10 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
     def poll_loop(self, sleep):
         l.info("poll loop initiated with sleep {}", sleep)
 
-        i = 1
+        i = 0
         while True:
+            i += 1
             l.debug("poll #{}", i)
-            i = i + 1
 
             # Long polling
             self.get_updates(
@@ -98,7 +100,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             ).wait()
 
 
-##############################################################################
+###############################################################################
 
 
 def main():
