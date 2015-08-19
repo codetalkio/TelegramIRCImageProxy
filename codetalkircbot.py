@@ -9,6 +9,9 @@ from twx import botapi
 import config
 
 
+CONFIG_FILE = "config.yaml"
+
+
 def init_logging():
     class NewStyleLogRecord(logging.LogRecord):
         def getMessage(self):
@@ -108,7 +111,7 @@ def main():
     l.error(msg)
 
     # Read config
-    conf = config.read_file()
+    conf = config.read_file(CONFIG_FILE)
 
     if not conf.telegram.token:
         l.error("no token found in config")

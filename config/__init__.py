@@ -3,8 +3,6 @@ import logging
 import yaml
 
 
-CONFIG_FILE = "config.yaml"
-
 l = logging.getLogger(__name__)
 
 
@@ -44,9 +42,9 @@ class Config(dict):
             return Config()  # return empty 'dict' as default
 
 
-def read_file(filename=CONFIG_FILE):
-    l.debug("reading config file: '{}'", CONFIG_FILE)
-    with open(CONFIG_FILE) as f:
+def read_file(filename):
+    l.debug("reading config file: '{}'", filename)
+    with open(filename) as f:
         config = Config(yaml.safe_load(f))
     l.debug("config: {!s}", config)
     return config
