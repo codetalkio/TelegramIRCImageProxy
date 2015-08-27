@@ -78,7 +78,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
                     l.critical("PhotoSizes were not sorted by size; {}", message.photo)
 
                 self.send_message(c_id, str(message.photo), reply_to_message_id=message.message_id,
-                                  callback=partial(l.info, "sent message~ | result: {}"))
+                                  on_success=partial(l.info, "sent message~ | result: {}"))
 
             if not self.offset or upd_id >= self.offset:
                 self.offset = upd_id + 1
@@ -98,7 +98,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             self.get_updates(
                 timeout=sleep,
                 offset=self.offset,
-                callback=self.handle_updates,  # on_succes=
+                on_success=self.handle_updates,
                 on_error=self.handle_error
             ).wait()
 
