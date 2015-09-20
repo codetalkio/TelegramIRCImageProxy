@@ -1,10 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from collections import namedtuple
+from datetime import datetime
 from functools import partial
 import logging
 import mimetypes
 import os
+from string import Template
 import sys
 import tempfile
 from threading import Thread
@@ -12,6 +14,8 @@ from threading import Thread
 # Required to use my up2date fork
 sys.path.insert(0, R"E:\Development\Python\twx.botapi")
 
+from imgurpython import ImgurClient
+from imgurpython.helpers.error import ImgurClientError
 from twx import botapi
 
 import config
@@ -51,8 +55,8 @@ l = logging.getLogger(__name__)
 
 _ImageInfo = namedtuple(
     '_ImageInfo',
-    ['time', 'username', 'c_id', 'm_id', 'caption', 'f_id', 'remote_path', 'ext',
-     'local_path']
+    ['time', 'username', 'c_id', 'm_id', 'caption', 'ext', 'f_id',
+     'remote_path', 'local_path', 'url']
 )
 
 
@@ -63,14 +67,15 @@ class ImageInfo(_ImageInfo):
         return partial(bot.send_message,
                        self.c_id,
                        reply_to_message_id=self.m_id,
-                       on_success=partial(l.info, "sent message | result: {}"))
+                       on_success=partial(l.info, "sent message | {}"))
 
 
 class CodetalkIRCBot_Telegram(botapi.TelegramBot):
 
-    def __init__(self, *args, on_file=None, **kwargs):
+    def __init__(self, conf, on_file, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._offset = None
+        self.conf = conf
         self.on_file = on_file
 
     @property
@@ -97,8 +102,8 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             # Out data storage object
             img = ImageInfo(time=message.date, username=message.sender.username,
                             c_id=message.chat.id, m_id=message.message_id,
-                            caption=message.caption, ext='.jpg',
-                            remote_path=None, local_path=None, f_id=None)
+                            caption=message.caption, ext='.jpg', f_id=None,
+                            remote_path=None, local_path=None, url=None)
 
             if message.document:
                 # Check for image mime types
@@ -111,7 +116,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
                         # Download document (image file)
                         img = img._replace(ext=ext, f_id=message.document.file_id)
                         Thread(target=self.download_file_thread,
-                               args=(img, img.make_reply_func(self))).run()
+                               args=(img, img.make_reply_func(self))).run()  # XXX change to start()
                     else:
                         self.send_message(message.chat.id, "I do not know how to handle that")
 
@@ -124,7 +129,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
                 # Download the file (always jpg)
                 img = img._replace(f_id=sorted_photo[-1].file_id)
                 Thread(target=self.download_file_thread,
-                       args=(img, img.make_reply_func(self))).run()
+                       args=(img, img.make_reply_func(self))).run()  # XXX change to start()
 
             elif message.text:
                 self.send_message(message.chat.id, "Just send me photos or images")
@@ -142,26 +147,39 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             reply_func(msg)
 
         file_info = self.get_file(img.f_id, on_error=on_get_file_error).wait()
+        l.info("file info: {}", file_info)
 
-        out_file = tempfile.mkstemp(suffix=img.ext, prefix="telegram_")
+        # Build file path
+        directory = (Template(self.conf.storage.directory or "$temp/telegram")
+                     .substitute(temp=tempfile.gettempdir()))
+        directory = os.path.abspath(directory)
+        basename = file_info.file_path.replace("/", "_")
+        out_file = os.path.join(directory, basename)
         img = img._replace(remote_path=file_info.file_path, local_path=out_file)
 
-        # Start download
-        result = self.download_file(img.remote_path, out_file=img.local_path).wait()
-
-        if isinstance(result, Exception):
-            msg = "Error downloading file: {}".format(result)
-            l.warn(msg)
-            reply_func(msg)
-            return
+        if os.path.exists(out_file):
+            l.warn("File exists already, skipping download: {}", out_file)
         else:
-            l.info("Downloaded file to: {}", out_file)
-            self.on_file(img, reply_func)
+            os.makedirs(directory, exist_ok=True)
+            # Do download
+            result = self.download_file(img.remote_path, out_file=img.local_path).wait()
+
+            if isinstance(result, Exception):
+                msg = "Error downloading file: {}".format(result)
+                l.warn(msg)
+                reply_func(msg)
+                return
+            else:
+                l.info("Downloaded file to: {}", img.local_path)
+
+        # Continue elsewhere
+        self.on_file(img, reply_func)
 
     def handle_error(self, error):
         l.error("failed to fetch data; {}", dict(error._asdict()))
 
-    def poll_loop(self, timeout):
+    def poll_loop(self):
+        timeout = self.conf.telegram.timeout
         l.info("poll loop initiated with timeout {}", timeout)
 
         i = 0
@@ -178,22 +196,40 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             ).wait()
 
 
-def upload_to_imgur(img, reply_func):
-    pass  # TODO
+def upload_to_imgur(conf, img, reply_func):
+    timestamp = datetime.fromtimestamp(img.time).strftime(
+        conf.imgur.timestamp_format or "%Y-%m-%dT%H.%M.%S"
+    )
+    config = dict(album=conf.imgur.album,
+                  name="{}_{}".format(timestamp, img.username),
+                  title=img.caption)
+
+    try:
+        client = ImgurClient(conf.imgur.client_id, conf.imgur.client_secret,
+                             refresh_token=conf.imgur.refresh_token)
+        data = client.upload_from_path(img.local_path, config=config, anon=False)
+    except ImgurClientError as e:
+        msg = "Error uploading to imgur: {0.status_code} {0.error_message}".format(e)
+        l.error(msg)
+        reply_func(msg)
+        raise
+
+    l.info("uploaded image {}", data)
+    l.debug("X-RateLimit-ClientRemaining: {}", client.credits['ClientRemaining'])
+
+    return data['link']
 
 
 ###############################################################################
-
 
 def main():
     msg = "logging level: {}".format(l.getEffectiveLevel())
     l.error(msg)
 
-    # Read config
+    # Read and verify config
     conf = config.read_file(CONFIG_FILE)
 
-    if not conf.telegram.token:
-        l.error("no token found in config")
+    if not config.verify(conf):
         return 2
 
     # Start IRC bot
@@ -201,19 +237,24 @@ def main():
 
     # File handling logic
     def handle_image_file(img, reply_func):
-        l.info("Handling image {}", img)
-        # url = upload_to_imgur(img.local_path, reply_func)
+        nonlocal conf
+
+        url = upload_to_imgur(conf, img, reply_func)
+        img = img._replace(url=url)
+
         # irc.post(url)
-        if config.storage.delete_images:
-            os.remove
-        pass
+        if conf.storage.delete_images:
+            os.remove(img.local_path)
+            img = img._replace(local_path=None)
+
+        reply_func("Uploaded file to: " + img.url)
 
     # Start Telegram bot
-    bot = CodetalkIRCBot_Telegram(token=conf.telegram.token, on_file=handle_image_file)
+    bot = CodetalkIRCBot_Telegram(conf, on_file=handle_image_file, token=conf.telegram.token)
     l.info("Me: {}", bot.update_bot_info().wait())
 
     # Main loop
-    bot.poll_loop(conf.telegram.timeout or 1)
+    bot.poll_loop()
 
 if __name__ == '__main__':
     sys.exit(main())

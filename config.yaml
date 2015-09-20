@@ -3,6 +3,13 @@
 telegram:
   token:  # obtain from @BotFather (https://telegram.me/BotFather)
   timeout: 5
+imgur:
+  client_id:  # obtain https://api.imgur.com/oauth2/addclient
+  client_secret:
+  refresh_token:  # obtain via authenticate_imgur.py
+  album:
+  timestamp_format:
 storage:
+  directory: $temp/codetalkirc  # $temp variable is available, relative paths are valid
   delete_images: false
 ...
