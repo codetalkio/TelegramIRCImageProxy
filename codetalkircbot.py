@@ -180,7 +180,7 @@ class TelegramImageBot(botapi.TelegramBot):
                     if ext in IMAGE_EXTENSIONS:
                         # Download document (image file)
                         img = img._replace(ext=ext, f_id=message.document.file_id)
-                        Thread(target=self.on_image, args=(img,)).start()
+                        self.on_image(img)
                     else:
                         self.send_message(message.chat.id, "I do not know how to handle that")
 
@@ -192,7 +192,7 @@ class TelegramImageBot(botapi.TelegramBot):
 
                 # Download the file (always jpg)
                 img = img._replace(f_id=sorted_photo[-1].file_id)
-                Thread(target=self.on_image, args=(img,)).start()
+                self.on_image(img)
             elif message.text:
                 self.send_message(message.chat.id, "Just send me photos or images")
             else:
