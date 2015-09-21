@@ -10,6 +10,7 @@ from string import Template
 import sys
 import tempfile
 from threading import Thread
+import time
 
 # Required to use my up2date fork
 sys.path.insert(0, R"E:\Development\Python\twx.botapi")
@@ -199,14 +200,28 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
 
 
 class MyIRCClient(asyncirc.IRCClient):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._connected = False
+
     def _process_data(self, line):
-        if line.split()[0] == "376":  # End of /MOTD command
-            self._connected = True
-        super()._process_data(self, line)
+        try:
+            code = int(line.split()[1])
+        except:
+            pass
+        else:
+            if code == 376:  # End of /MOTD command
+                self._connected = True
+                l.info("IRCClient connected")
+            elif code == 433:  # Nickname is already in use
+                self.nick += "_"
+                self.send_raw("NICK {nick}".format(nick=self.nick))
+
+        super()._process_data(line)
 
     def wait_connected(self, timeout=7):
-        import time
         start = time.time()
+        l.debug("Waiting for IRCClient to connect")
         while time.time() < start + timeout:
             if self._connected:
                 return True
@@ -263,7 +278,8 @@ def main():
     if not irc_bot.wait_connected():
         l.error("Couldn't connect to IRC")
         return 3
-    irc_bot.join(conf.irc.channel)
+    # Don't need to join spam because chanmode 'n' is not set
+    # irc_bot.join(conf.irc.channel)
 
     # File handling logic
     def handle_image_file(img, reply_func):
