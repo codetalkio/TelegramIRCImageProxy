@@ -27,29 +27,6 @@ import config
 CONFIG_FILE = "config.yaml"
 IMAGE_EXTENSIONS = (".jpg", ".png", ".gif")
 
-
-def init_logging():
-    class NewStyleLogRecord(logging.LogRecord):
-        def getMessage(self):
-            msg = self.msg
-            if not isinstance(self.msg, str):
-                msg = str(self.msg)
-            if not isinstance(self.args, tuple):
-                self.args = (self.args,)
-            return msg.rstrip().format(*self.args)
-    logging.setLogRecordFactory(NewStyleLogRecord)
-
-    fmt = logging.Formatter("| {levelname:^8} | {message} (from {name})",
-                            style='{')
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(fmt)
-    # Filter out requests logging, for now
-    handler.addFilter(
-        lambda r: (not r.name.startswith("requests")) or r.levelno > 20
-    )
-
-    logging.basicConfig(level=logging.DEBUG, handlers=[handler])
-
 l = logging.getLogger(__name__)
 
 
@@ -391,16 +368,59 @@ class ImageReceivedThread(Thread):
 ###############################################################################
 
 
+def verify_config(conf):
+    if not conf.telegram.token:
+        l.error("no telegram token found")
+
+    elif not conf.imgur.client_id or not conf.imgur.client_secret:
+        l.error("no imgur client info found")
+
+    elif not conf.imgur.refresh_token:
+        l.error("no imgur refresh_token found. Create one with authenticate_imgur.py")
+
+    elif not conf.irc.host or not conf.irc.channel or not conf.irc.nick:
+        l.error("no sufficient irc configuration found")
+
+    else:
+        return True
+
+
+def init_logging():
+    class NewStyleLogRecord(logging.LogRecord):
+        def getMessage(self):
+            msg = self.msg
+            if not isinstance(self.msg, str):
+                msg = str(self.msg)
+            if not isinstance(self.args, tuple):
+                self.args = (self.args,)
+            return msg.rstrip().format(*self.args)
+    logging.setLogRecordFactory(NewStyleLogRecord)
+
+    fmt = logging.Formatter("| {levelname:^8} | {message} (from {name})",
+                            style='{')
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(fmt)
+    # Filter out requests logging, for now
+    handler.addFilter(
+        lambda r: (not r.name.startswith("requests")) or r.levelno > 20
+    )
+
+    logging.basicConfig(level=logging.DEBUG, handlers=[handler])
+
+
+###############################################################################
+
+
 def main():
     init_logging()
 
     msg = "logging level: {}".format(l.getEffectiveLevel())
-    l.critical(msg)
+    print(msg)
 
     # Read and verify config
     conf = config.read_file(CONFIG_FILE)
 
-    if not config.verify(conf):
+    if not verify_config(conf):
         return 2
 
     # Start IRC bot

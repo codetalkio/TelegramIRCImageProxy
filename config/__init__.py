@@ -48,20 +48,3 @@ def read_file(filename):
         config = Config(yaml.safe_load(f))
     l.debug("config: {!s}", config)
     return config
-
-
-def verify(conf):
-    if not conf.telegram.token:
-        l.error("no telegram token found")
-
-    elif not conf.imgur.client_id or not conf.imgur.client_secret:
-        l.error("no imgur client info found")
-
-    elif not conf.imgur.refresh_token:
-        l.error("no imgur refresh_token found. Create one with authenticate_imgur.py")
-
-    elif not conf.irc.host or not conf.irc.channel or not conf.irc.nick:
-        l.error("no sufficient irc configuration found")
-
-    else:
-        return True
