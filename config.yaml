@@ -12,6 +12,7 @@ imgur:
 storage:
   directory: $temp/codetalkirc  # $temp variable is available, relative paths are valid
   delete_images: false
+  database: images.db
 irc:
   nick: TelegramBot
   host: irc.codetalk.io
