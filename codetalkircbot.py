@@ -179,7 +179,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
         self.on_file(img, reply_func)
 
     def handle_error(self, error):
-        l.error("failed to fetch data; {}", dict(error._asdict()))
+        l.error("failed to fetch data; {}", error)
 
     def poll_loop(self):
         timeout = self.conf.telegram.timeout
@@ -191,12 +191,15 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             l.debug("poll #{}", i)
 
             # Long polling
-            self.get_updates(
+            result = self.get_updates(
                 timeout=timeout,
                 offset=self.offset,
                 on_success=self.handle_updates,
                 on_error=self.handle_error
             ).wait()
+            if result.error_code != 200:
+                # Delay next poll if there was an error
+                time.sleep(timeout)
 
 
 class MyIRCClient(asyncirc.IRCClient):
