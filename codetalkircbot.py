@@ -293,6 +293,11 @@ class ImageReceivedThread(Thread):
             if self.conf.storage.delete_images:
                 os.remove(self.img.local_path)
                 self.img = self.img._replace(local_path=None)
+        except Exception as e:
+            self.reply("Oops, there was an error. Contact @fichtefoll and run in circles.\n"
+                       "Error: " + str(e))
+            l.error("Uncaught error in ImageReceivedThread: {}", e)
+            raise
         finally:
             if db:
                 if not db_img:
@@ -326,7 +331,7 @@ class ImageReceivedThread(Thread):
                                            out_file=self.img.local_path).wait()
         if isinstance(result, Exception):
             msg = "Error downloading file: {}".format(result)
-            l.warn(msg)
+            l.error(msg)
             self.reply(msg)
             return False
         else:
