@@ -270,7 +270,7 @@ def main():
         return 2
 
     # Start IRC bot
-    irc_bot = asyncirc.IRCClient(
+    irc_bot = MyIRCClient(
         host=conf.irc.host,
         port=conf.irc.port or 6667,
         nick=conf.irc.nick,
