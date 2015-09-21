@@ -65,6 +65,7 @@ ImageInfo = namedtuple(
 class ImageDatabase(object):
     def __init__(self, dbpath):
         self.db = sqlite3.connect(dbpath)
+        # self.db.row_factory = sqlite3.Row
 
         self.create_table()
 
@@ -90,13 +91,21 @@ class ImageDatabase(object):
         row = cursor.fetchone()
         if row is None:
             return
+
         db_img = ImageInfo(*row)
         l.debug("found image in database: {}", db_img)
         return db_img
 
+    def get_unfinished_images(self):
+        results = [ImageInfo(*row)
+                   for row in self.db.execute("SELECT * FROM images WHERE finished = 0")]
+
+        l.debug("found {} unfinished images in database", len(results))
+        return results
+
     def insert_image(self, img):
         self.db.execute(
-            """INSERT INTO images VALUES (%s)"""
+            "INSERT INTO images VALUES (%s)"
             % ", ".join(("?",) * len(img)),
             img
         )
@@ -115,6 +124,13 @@ class ImageDatabase(object):
 
     def close(self):
         self.db.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
 
 class TelegramImageBot(botapi.TelegramBot):
@@ -406,14 +422,25 @@ def main():
     # Register main callback as a closure
     def on_image(img):
         nonlocal conf, irc_bot, tg_bot
-        ImageReceivedThread(
+        thread = ImageReceivedThread(
             conf=conf,
             irc_bot=irc_bot,
             tg_bot=tg_bot,
             img=img
-        ).start()
+        )
+        thread.start()
+        return thread
 
     tg_bot.on_image = on_image
+
+    if conf.storage.database:
+        with ImageDatabase(conf.storage.database) as db:
+            backlog = db.get_unfinished_images()
+        if backlog:
+            l.info("Going through backlog, size: {}", len(backlog))
+            for img in backlog:
+                on_image(img).join()
+            l.info("Finished backlog")
 
     # Main loop
     tg_bot.poll_loop()
