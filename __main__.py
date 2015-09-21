@@ -378,7 +378,7 @@ def verify_config(conf):
     elif not conf.imgur.refresh_token:
         l.error("no imgur refresh_token found. Create one with authenticate_imgur.py")
 
-    elif not conf.irc.host or not conf.irc.channel or not conf.irc.nick:
+    elif not conf.irc.host or not conf.irc.channel:
         l.error("no sufficient irc configuration found")
 
     else:
@@ -427,7 +427,7 @@ def main():
     irc_bot = MyIRCClient(
         host=conf.irc.host,
         port=conf.irc.port or 6667,
-        nick=conf.irc.nick,
+        nick=conf.irc.nick or "TelegramBot",
         realname=conf.irc.nick,
         # use_ssl=conf.irc.ssl or False
     )

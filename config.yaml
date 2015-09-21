@@ -17,6 +17,6 @@ irc:
   nick: TelegramBot
   host: irc.codetalk.io
   #port: 6697
-  #ssl: true
+  #ssl: true  # currently unsupported
   channel: '#lobby'
 ...
