@@ -412,8 +412,8 @@ def main():
     if not irc_bot.wait_connected():
         l.error("Couldn't connect to IRC")
         return 3
-    # Don't need to join spam because chanmode 'n' is not set
-    # irc_bot.join(conf.irc.channel)
+    # Don't need to join channel because chanmode 'n' is not set
+    irc_bot.join(conf.irc.channel)
 
     # Start Telegram bot
     tg_bot = TelegramImageBot(conf, token=conf.telegram.token)
