@@ -356,11 +356,14 @@ class ImageReceivedThread(Thread):
 
     def upload_file(self):
         timestamp = datetime.fromtimestamp(self.img.time).strftime(
-            self.conf.imgur.timestamp_format or "%Y-%m-%dT%H.%M.%S"
+            self.conf.imgur.timestamp_format or "%Y-%m-%dT%H:%M:%S"
         )
-        config = dict(album=self.conf.imgur.album,
-                      name="{}_{}".format(timestamp, self.img.username),
-                      title=self.img.caption)
+        config = dict(
+            album=self.conf.imgur.album,
+            name="{}_{}".format(timestamp, self.img.username).replace(":", "-"),
+            title="{} (by {}; {})".format(self.img.caption or "No caption",
+                                          self.img.username, timestamp)
+        )
 
         try:
             client = ImgurClient(self.conf.imgur.client_id, self.conf.imgur.client_secret,
