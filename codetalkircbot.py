@@ -7,6 +7,7 @@ import logging
 import mimetypes
 import os
 from string import Template
+import sqlite3
 import sys
 import tempfile
 from threading import Thread
@@ -56,9 +57,64 @@ l = logging.getLogger(__name__)
 
 ImageInfo = namedtuple(
     'ImageInfo',
-    ['time', 'username', 'c_id', 'm_id', 'caption', 'ext', 'f_id',
+    ['f_id', 'time', 'username', 'c_id', 'm_id', 'caption', 'ext',
      'remote_path', 'local_path', 'url', 'finished']
 )
+
+
+class ImageDatabase(object):
+    def __init__(self, dbpath):
+        self.db = sqlite3.connect(dbpath)
+
+        self.create_table()
+
+    def create_table(self):
+        self.db.execute(
+            """CREATE TABLE IF NOT EXISTS images (
+                f_id TEXT PRIMARY KEY,
+                time INTEGER,
+                username TEXT,
+                c_id INTEGER,
+                m_id INTEGER,
+                caption TEXT,
+                ext TEXT,
+                remote_path TEXT,
+                local_path TEXT,
+                url TEXT,
+                finished INTEGER
+            )"""
+        )
+
+    def find_image(self, img):
+        cursor = self.db.execute("SELECT * FROM images WHERE f_id = ?", (img.f_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return
+        db_img = ImageInfo(*row)
+        l.debug("found image in database: {}", db_img)
+        return db_img
+
+    def insert_image(self, img):
+        self.db.execute(
+            """INSERT INTO images VALUES (%s)"""
+            % ", ".join(("?",) * len(img)),
+            img
+        )
+        self.db.commit()
+        l.debug("inserted image into database: {}", img)
+
+    def update_image(self, img):
+        update_columns = ('remote_path', 'local_path', 'url', 'finished')
+        self.db.execute(
+            """UPDATE images SET %s WHERE :f_id = ?"""
+            % ", ".join("{0}=:{0}".format(key) for key in update_columns),
+            img._asdict()
+        )
+        self.db.commit()
+        l.debug("updated image in database: {}", img)
+
+    def close(self):
+        self.db.close()
 
 
 class TelegramImageBot(botapi.TelegramBot):
@@ -91,9 +147,11 @@ class TelegramImageBot(botapi.TelegramBot):
             l.debug("handling update: {}", update)
 
             # Out data storage object
-            img = ImageInfo(time=message.date, username=message.sender.username,
+            img = ImageInfo(f_id=None,
+                            time=message.date,
+                            username=message.sender.username,
                             c_id=message.chat.id, m_id=message.message_id,
-                            caption=message.caption, ext='.jpg', f_id=None,
+                            caption=message.caption, ext='.jpg',
                             remote_path=None, local_path=None, url=None, finished=False)
 
             if message.document:
@@ -200,8 +258,16 @@ class ImageReceivedThread(Thread):
         )
 
     def run(self):
+        # Must be created in thread because multi-threading is now allowed
+        db = ImageDatabase(self.conf.storage.database) if self.conf.storage.database else None
+
         try:
+            l.debug("Running ImageReceivedThread with {}", self.img)
             # Check if we recieved the file already and see how far we got
+            if db:
+                db_img = db.find_image(self.img)
+                if db_img:
+                    self.img = db_img
 
             # Download file if necessary
             if not self.img.local_path or not os.path.exists(self.img.local_path):
@@ -228,8 +294,12 @@ class ImageReceivedThread(Thread):
                 os.remove(self.img.local_path)
                 self.img = self.img._replace(local_path=None)
         finally:
-            # self.updae_database()
-            pass
+            if db:
+                if not db_img:
+                    db.insert_image(self.img)
+                elif self.img != db_img:
+                    db.update_image(self.img)
+                db.close()
 
     def download_file(self):
         # Get file info
@@ -328,9 +398,15 @@ def main():
     tg_bot = TelegramImageBot(conf, token=conf.telegram.token)
     l.info("Me: {}", tg_bot.update_bot_info().wait())
 
-    # Register main callback
+    # Register main callback as a closure
     def on_image(img):
-        ImageReceivedThread(conf, irc_bot, tg_bot, img).start()
+        nonlocal conf, irc_bot, tg_bot
+        ImageReceivedThread(
+            conf=conf,
+            irc_bot=irc_bot,
+            tg_bot=tg_bot,
+            img=img
+        ).start()
 
     tg_bot.on_image = on_image
 
