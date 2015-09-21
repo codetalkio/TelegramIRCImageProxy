@@ -370,22 +370,22 @@ class ImageReceivedThread(Thread):
 
 def verify_config(conf):
     if not conf.telegram.token:
-        l.error("no telegram token found")
+        l.critical("no telegram token found")
 
     elif not conf.imgur.client_id or not conf.imgur.client_secret:
-        l.error("no imgur client info found")
+        l.critical("no imgur client info found")
 
     elif not conf.imgur.refresh_token:
-        l.error("no imgur refresh_token found. Create one with authenticate_imgur.py")
+        l.critical("no imgur refresh_token found. Create one with authenticate_imgur.py")
 
     elif not conf.irc.host or not conf.irc.channel:
-        l.error("no sufficient irc configuration found")
+        l.critical("no sufficient irc configuration found")
 
     else:
         return True
 
 
-def init_logging():
+def init_logging(conf, level):
     class NewStyleLogRecord(logging.LogRecord):
         def getMessage(self):
             msg = self.msg
@@ -396,7 +396,7 @@ def init_logging():
             return msg.rstrip().format(*self.args)
     logging.setLogRecordFactory(NewStyleLogRecord)
 
-    fmt = logging.Formatter("| {levelname:^8} | {message} (from {name})",
+    fmt = logging.Formatter("| {levelname:^8} | {message} (from {name}; {threadName})",
                             style='{')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(fmt)
@@ -405,21 +405,34 @@ def init_logging():
         lambda r: (not r.name.startswith("requests")) or r.levelno > 20
     )
 
-    logging.basicConfig(level=logging.DEBUG, handlers=[handler])
+    handlers = [handler]
+
+    if conf.logging.active:
+        fmt = logging.Formatter(
+            "| {asctime} | {levelname:^8} | {message} (from {name}; {threadName})",
+            style='{'
+        )
+        handler = logging.StreamHandler(open(conf.logging.path or "errors.log", "a"))
+        handler.setFormatter(fmt)
+        conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
+        handler.addFilter(lambda r: r.levelno >= conf_level)
+
+        handlers.append(handler)
+
+    logging.basicConfig(level=level, handlers=handlers)
+    print("-- logging level: {}".format(l.getEffectiveLevel()))
 
 
 ###############################################################################
 
 
 def main():
-    init_logging()
-
-    msg = "logging level: {}".format(l.getEffectiveLevel())
-    print(msg)
-
-    # Read and verify config
+    # Read config, init logging
     conf = config.read_file(CONFIG_FILE)
+    init_logging(conf=conf, level=logging.INFO)
+    l.info("config: {!s}", config)
 
+    # Verify other config
     if not verify_config(conf):
         return 2
 
@@ -432,8 +445,8 @@ def main():
         # use_ssl=conf.irc.ssl or False
     )
     irc_bot.start()
-    if not irc_bot.wait_connected():
-        l.error("Couldn't connect to IRC")
+    if not irc_bot.wait_connected(conf.irc.timeout or 7):
+        l.critical("Couldn't connect to IRC")
         return 3
     # Don't need to join channel because chanmode 'n' is not set
     irc_bot.join(conf.irc.channel)
@@ -456,6 +469,7 @@ def main():
 
     tg_bot.on_image = on_image
 
+    # Go through backlog and reschedule failed image uploads
     if conf.storage.database:
         with ImageDatabase(conf.storage.database) as db:
             backlog = db.get_unfinished_images()

@@ -19,4 +19,9 @@ irc:
   #port: 6697
   #ssl: true  # currently unsupported
   channel: '#lobby'
+  timeout: 7
+logging:
+  active: true
+  path: errrors.log
+  level: WARN
 ...
