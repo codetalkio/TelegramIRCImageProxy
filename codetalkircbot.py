@@ -36,7 +36,7 @@ def init_logging():
                 msg = str(self.msg)
             if not isinstance(self.args, tuple):
                 self.args = (self.args,)
-            return msg.format(*self.args)
+            return msg.rstrip().format(*self.args)
     logging.setLogRecordFactory(NewStyleLogRecord)
 
     fmt = logging.Formatter("| {levelname:^8} | {message} (from {name})",
