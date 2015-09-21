@@ -14,6 +14,7 @@ from threading import Thread
 # Required to use my up2date fork
 sys.path.insert(0, R"E:\Development\Python\twx.botapi")
 
+import asyncirc
 from imgurpython import ImgurClient
 from imgurpython.helpers.error import ImgurClientError
 from twx import botapi
@@ -66,6 +67,7 @@ class ImageInfo(_ImageInfo):
     def make_reply_func(self, bot):
         return partial(bot.send_message,
                        self.c_id,
+                       disable_web_page_preview=True,
                        reply_to_message_id=self.m_id,
                        on_success=partial(l.info, "sent message | {}"))
 
@@ -196,6 +198,23 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             ).wait()
 
 
+class MyIRCClient(asyncirc.IRCClient):
+    def _process_data(self, line):
+        if line.split()[0] == "376":  # End of /MOTD command
+            self._connected = True
+        super()._process_data(self, line)
+
+    def wait_connected(self, timeout=7):
+        import time
+        start = time.time()
+        while time.time() < start + timeout:
+            if self._connected:
+                return True
+            time.sleep(0.1)
+        else:
+            return False
+
+
 def upload_to_imgur(conf, img, reply_func):
     timestamp = datetime.fromtimestamp(img.time).strftime(
         conf.imgur.timestamp_format or "%Y-%m-%dT%H.%M.%S"
@@ -224,7 +243,7 @@ def upload_to_imgur(conf, img, reply_func):
 
 def main():
     msg = "logging level: {}".format(l.getEffectiveLevel())
-    l.error(msg)
+    l.critical(msg)
 
     # Read and verify config
     conf = config.read_file(CONFIG_FILE)
@@ -233,28 +252,44 @@ def main():
         return 2
 
     # Start IRC bot
-    # TODO
+    irc_bot = asyncirc.IRCClient(
+        host=conf.irc.host,
+        port=conf.irc.port or 6667,
+        nick=conf.irc.nick,
+        realname=conf.irc.nick + '_',
+        # use_ssl=conf.irc.ssl or False
+    )
+    irc_bot.start()
+    if not irc_bot.wait_connected():
+        l.error("Couldn't connect to IRC")
+        return 3
+    irc_bot.join(conf.irc.channel)
 
     # File handling logic
     def handle_image_file(img, reply_func):
-        nonlocal conf
+        nonlocal conf, irc_bot
 
         url = upload_to_imgur(conf, img, reply_func)
         img = img._replace(url=url)
 
-        # irc.post(url)
+        # Send message
+        pre_msg = ("<{{0.username}}>: {}{{0.url}}"
+                   .format("{0.caption} " if img.caption else ""))
+        msg = pre_msg.format(img)
+        irc_bot.msg(conf.irc.channel, msg)
+
         if conf.storage.delete_images:
             os.remove(img.local_path)
             img = img._replace(local_path=None)
 
-        reply_func("Uploaded file to: " + img.url)
+        reply_func("Image delivered. Uploaded to: " + img.url)
 
     # Start Telegram bot
-    bot = CodetalkIRCBot_Telegram(conf, on_file=handle_image_file, token=conf.telegram.token)
-    l.info("Me: {}", bot.update_bot_info().wait())
+    tg_bot = CodetalkIRCBot_Telegram(conf, on_file=handle_image_file, token=conf.telegram.token)
+    l.info("Me: {}", tg_bot.update_bot_info().wait())
 
     # Main loop
-    bot.poll_loop()
+    tg_bot.poll_loop()
 
 if __name__ == '__main__':
     sys.exit(main())

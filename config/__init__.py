@@ -60,5 +60,8 @@ def verify(conf):
     elif not conf.imgur.refresh_token:
         l.error("no imgur refresh_token found. Create one with authenticate_imgur.py")
 
+    elif not conf.irc.host or not conf.irc.channel or not conf.irc.nick:
+        l.error("no sufficient irc configuration found")
+
     else:
         return True
