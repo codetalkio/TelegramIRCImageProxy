@@ -55,31 +55,20 @@ l = logging.getLogger(__name__)
 
 ###############################################################################
 
-_ImageInfo = namedtuple(
-    '_ImageInfo',
+ImageInfo = namedtuple(
+    'ImageInfo',
     ['time', 'username', 'c_id', 'm_id', 'caption', 'ext', 'f_id',
-     'remote_path', 'local_path', 'url']
+     'remote_path', 'local_path', 'url', 'finished']
 )
 
 
-class ImageInfo(_ImageInfo):
-    __slots__ = ()
+class TelegramImageBot(botapi.TelegramBot):
 
-    def make_reply_func(self, bot):
-        return partial(bot.send_message,
-                       self.c_id,
-                       disable_web_page_preview=True,
-                       reply_to_message_id=self.m_id,
-                       on_success=partial(l.info, "sent message | {}"))
-
-
-class CodetalkIRCBot_Telegram(botapi.TelegramBot):
-
-    def __init__(self, conf, on_file, *args, **kwargs):
+    def __init__(self, conf, on_image=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._offset = None
         self.conf = conf
-        self.on_file = on_file
+        self.on_image = on_image
 
     @property
     def offset(self):
@@ -106,7 +95,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
             img = ImageInfo(time=message.date, username=message.sender.username,
                             c_id=message.chat.id, m_id=message.message_id,
                             caption=message.caption, ext='.jpg', f_id=None,
-                            remote_path=None, local_path=None, url=None)
+                            remote_path=None, local_path=None, url=None, finished=False)
 
             if message.document:
                 # Check for image mime types
@@ -118,8 +107,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
                     if ext in IMAGE_EXTENSIONS:
                         # Download document (image file)
                         img = img._replace(ext=ext, f_id=message.document.file_id)
-                        Thread(target=self.download_file_thread,
-                               args=(img, img.make_reply_func(self))).run()  # XXX change to start()
+                        Thread(target=self.on_image, args=(img,)).start()
                     else:
                         self.send_message(message.chat.id, "I do not know how to handle that")
 
@@ -131,9 +119,7 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
 
                 # Download the file (always jpg)
                 img = img._replace(f_id=sorted_photo[-1].file_id)
-                Thread(target=self.download_file_thread,
-                       args=(img, img.make_reply_func(self))).run()  # XXX change to start()
-
+                Thread(target=self.on_image, args=(img,)).start()
             elif message.text:
                 self.send_message(message.chat.id, "Just send me photos or images")
             else:
@@ -142,41 +128,6 @@ class CodetalkIRCBot_Telegram(botapi.TelegramBot):
 
             if not self.offset or upd_id >= self.offset:
                 self.offset = upd_id + 1
-
-    def download_file_thread(self, img, reply_func):
-        def on_get_file_error(error):
-            msg = "Error getting file info: {}".format(dict(error._asdict()))
-            l.error(msg)
-            reply_func(msg)
-
-        file_info = self.get_file(img.f_id, on_error=on_get_file_error).wait()
-        l.info("file info: {}", file_info)
-
-        # Build file path
-        directory = (Template(self.conf.storage.directory or "$temp/telegram")
-                     .substitute(temp=tempfile.gettempdir()))
-        directory = os.path.abspath(directory)
-        basename = file_info.file_path.replace("/", "_")
-        out_file = os.path.join(directory, basename)
-        img = img._replace(remote_path=file_info.file_path, local_path=out_file)
-
-        if os.path.exists(out_file):
-            l.warn("File exists already, skipping download: {}", out_file)
-        else:
-            os.makedirs(directory, exist_ok=True)
-            # Do download
-            result = self.download_file(img.remote_path, out_file=img.local_path).wait()
-
-            if isinstance(result, Exception):
-                msg = "Error downloading file: {}".format(result)
-                l.warn(msg)
-                reply_func(msg)
-                return
-            else:
-                l.info("Downloaded file to: {}", img.local_path)
-
-        # Continue elsewhere
-        self.on_file(img, reply_func)
 
     def handle_error(self, error):
         l.error("failed to fetch data; {}", error)
@@ -233,31 +184,120 @@ class MyIRCClient(asyncirc.IRCClient):
             return False
 
 
-def upload_to_imgur(conf, img, reply_func):
-    timestamp = datetime.fromtimestamp(img.time).strftime(
-        conf.imgur.timestamp_format or "%Y-%m-%dT%H.%M.%S"
-    )
-    config = dict(album=conf.imgur.album,
-                  name="{}_{}".format(timestamp, img.username),
-                  title=img.caption)
+class ImageReceivedThread(Thread):
+    def __init__(self, conf, irc_bot, tg_bot, img, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.conf = conf
+        self.irc_bot = irc_bot
+        self.tg_bot = tg_bot
+        self.img = img
 
-    try:
-        client = ImgurClient(conf.imgur.client_id, conf.imgur.client_secret,
-                             refresh_token=conf.imgur.refresh_token)
-        data = client.upload_from_path(img.local_path, config=config, anon=False)
-    except ImgurClientError as e:
-        msg = "Error uploading to imgur: {0.status_code} {0.error_message}".format(e)
-        l.error(msg)
-        reply_func(msg)
-        raise
+    def reply(self, msg):
+        self.tg_bot.send_message(
+            self.c_id,
+            msg,
+            disable_web_page_preview=True,
+            reply_to_message_id=self.m_id,
+            on_success=partial(l.info, "sent message | {}")
+        )
 
-    l.info("uploaded image {}", data)
-    l.debug("X-RateLimit-ClientRemaining: {}", client.credits['ClientRemaining'])
+    def run(self):
+        try:
+            # Check if we recieved the file already and see how far we got
 
-    return data['link']
+            # Download file if necessary
+            if not self.img.local_path or not os.path.exists(self.img.local_path):
+                if not self.download_file():
+                    return
+            else:
+                l.warn("File exists already, skipping download: {}", self.img.local_path)
+
+            # Upload file if necessary
+            if not self.img.url:
+                self.upload_file()
+            else:
+                l.warn("File already uploaded: {}", self.img.url)
+
+            # Post to IRC
+            self.post_to_irc()
+
+            # Report success
+            self.reply("Image delivered. Uploaded to: " + self.img.url)
+            self.img = self.img._replace(finished=True)
+
+            # Cleanup
+            if self.conf.storage.delete_images:
+                os.remove(self.img.local_path)
+                self.img = self.img._replace(local_path=None)
+        finally:
+            # self.updae_database()
+            pass
+
+    def download_file(self):
+        # Get file info
+        file_info = self.tg_bot.get_file(self.img.f_id).wait()
+        if isinstance(file_info, botapi.Error):
+            msg = "Error getting file info: {}".format(file_info)
+            l.error(msg)
+            self.reply(msg)
+            return False
+
+        l.info("file info: {}", file_info)
+
+        # Build file path
+        directory = (Template(self.conf.storage.directory or "$temp/telegram")
+                     .substitute(temp=tempfile.gettempdir()))
+        directory = os.path.abspath(directory)
+        basename = file_info.file_path.replace("/", "_")
+        out_file = os.path.join(directory, basename)
+        self.img = self.img._replace(remote_path=file_info.file_path, local_path=out_file)
+
+        # Do download
+        os.makedirs(directory, exist_ok=True)
+        result = self.tg_bot.download_file(self.img.remote_path,
+                                           out_file=self.img.local_path).wait()
+        if isinstance(result, Exception):
+            msg = "Error downloading file: {}".format(result)
+            l.warn(msg)
+            self.reply(msg)
+            return False
+        else:
+            l.info("Downloaded file to: {}", self.img.local_path)
+            return True
+
+    def upload_file(self):
+        timestamp = datetime.fromtimestamp(self.img.time).strftime(
+            self.conf.imgur.timestamp_format or "%Y-%m-%dT%H.%M.%S"
+        )
+        config = dict(album=self.conf.imgur.album,
+                      name="{}_{}".format(timestamp, self.img.username),
+                      title=self.img.caption)
+
+        try:
+            client = ImgurClient(self.conf.imgur.client_id, self.conf.imgur.client_secret,
+                                 refresh_token=self.conf.imgur.refresh_token)
+            data = client.upload_from_path(self.img.local_path, config=config, anon=False)
+        except ImgurClientError as e:
+            msg = "Error uploading to imgur: {0.status_code} {0.error_message}".format(e)
+            l.error(msg)
+            self.reply(msg)
+            raise
+
+        l.info("uploaded image: {}", data)
+        l.debug("X-RateLimit-ClientRemaining: {}", client.credits['ClientRemaining'])
+
+        self.img = self.img._replace(url=data['link'])
+        return True
+
+    def post_to_irc(self):
+        pre_msg = ("<{{0.username}}>: {}{{0.url}}"
+                   .format("{0.caption} " if self.img.caption else ""))
+        msg = pre_msg.format(self.img)
+        self.irc_bot.msg(self.conf.irc.channel, msg)
 
 
 ###############################################################################
+
 
 def main():
     msg = "logging level: {}".format(l.getEffectiveLevel())
@@ -284,28 +324,15 @@ def main():
     # Don't need to join spam because chanmode 'n' is not set
     # irc_bot.join(conf.irc.channel)
 
-    # File handling logic
-    def handle_image_file(img, reply_func):
-        nonlocal conf, irc_bot
-
-        url = upload_to_imgur(conf, img, reply_func)
-        img = img._replace(url=url)
-
-        # Send message
-        pre_msg = ("<{{0.username}}>: {}{{0.url}}"
-                   .format("{0.caption} " if img.caption else ""))
-        msg = pre_msg.format(img)
-        irc_bot.msg(conf.irc.channel, msg)
-
-        if conf.storage.delete_images:
-            os.remove(img.local_path)
-            img = img._replace(local_path=None)
-
-        reply_func("Image delivered. Uploaded to: " + img.url)
-
     # Start Telegram bot
-    tg_bot = CodetalkIRCBot_Telegram(conf, on_file=handle_image_file, token=conf.telegram.token)
+    tg_bot = TelegramImageBot(conf, token=conf.telegram.token)
     l.info("Me: {}", tg_bot.update_bot_info().wait())
+
+    # Register main callback
+    def on_image(img):
+        ImageReceivedThread(conf, irc_bot, tg_bot, img).start()
+
+    tg_bot.on_image = on_image
 
     # Main loop
     tg_bot.poll_loop()
