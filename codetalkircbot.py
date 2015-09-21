@@ -106,7 +106,7 @@ class ImageDatabase(object):
     def update_image(self, img):
         update_columns = ('remote_path', 'local_path', 'url', 'finished')
         self.db.execute(
-            """UPDATE images SET %s WHERE :f_id = ?"""
+            "UPDATE images SET %s WHERE f_id = :f_id"
             % ", ".join("{0}=:{0}".format(key) for key in update_columns),
             img._asdict()
         )
