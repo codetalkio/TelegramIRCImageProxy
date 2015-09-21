@@ -131,6 +131,8 @@ class TelegramImageBot(botapi.TelegramBot):
 
     def handle_error(self, error):
         l.error("failed to fetch data; {}", error)
+        # Delay next poll if there was an error
+        time.sleep(self.conf.telegram.timeout)
 
     def poll_loop(self):
         timeout = self.conf.telegram.timeout
@@ -142,15 +144,12 @@ class TelegramImageBot(botapi.TelegramBot):
             l.debug("poll #{}", i)
 
             # Long polling
-            result = self.get_updates(
+            self.get_updates(
                 timeout=timeout,
                 offset=self.offset,
                 on_success=self.handle_updates,
                 on_error=self.handle_error
             ).wait()
-            if result.error_code != 200:
-                # Delay next poll if there was an error
-                time.sleep(timeout)
 
 
 class MyIRCClient(asyncirc.IRCClient):
