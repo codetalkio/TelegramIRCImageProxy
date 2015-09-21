@@ -49,7 +49,6 @@ def init_logging():
 
     logging.basicConfig(level=logging.DEBUG, handlers=[handler])
 
-init_logging()
 l = logging.getLogger(__name__)
 
 
@@ -299,6 +298,8 @@ class ImageReceivedThread(Thread):
 
 
 def main():
+    init_logging()
+
     msg = "logging level: {}".format(l.getEffectiveLevel())
     l.critical(msg)
 
