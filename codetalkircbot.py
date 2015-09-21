@@ -192,10 +192,10 @@ class ImageReceivedThread(Thread):
 
     def reply(self, msg):
         self.tg_bot.send_message(
-            self.c_id,
+            self.img.c_id,
             msg,
             disable_web_page_preview=True,
-            reply_to_message_id=self.m_id,
+            reply_to_message_id=self.img.m_id,
             on_success=partial(l.info, "sent message | {}")
         )
 
@@ -314,7 +314,7 @@ def main():
         host=conf.irc.host,
         port=conf.irc.port or 6667,
         nick=conf.irc.nick,
-        realname=conf.irc.nick + '_',
+        realname=conf.irc.nick,
         # use_ssl=conf.irc.ssl or False
     )
     irc_bot.start()
