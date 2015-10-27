@@ -53,9 +53,6 @@ class TelegramImageBot(botapi.TelegramBot):
         for update in updates:
             upd_id, message = update.update_id, update.message
 
-            c_id = message.chat
-            self.send_chat_action(c_id, botapi.ChatAction.PHOTO)
-
             l.debug("handling update: {}", update)
 
             # Out data storage object
@@ -170,6 +167,9 @@ class ImageReceivedThread(Thread):
         )
 
     def run(self):
+        # Show that we're doing something
+        self.send_chat_action(self.img.c_id, botapi.ChatAction.PHOTO)
+
         # Must be created in thread because multi-threading is now allowed
         db = ImageDatabase(self.conf.storage.database) if self.conf.storage.database else None
 
