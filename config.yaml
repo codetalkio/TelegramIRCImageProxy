@@ -13,6 +13,7 @@ storage:
   directory: $temp/codetalkirc  # $temp variable is available, relative paths are valid
   delete_images: false
   database: images.db
+  user_database: users.json
 irc:
   nick: TelegramBot
   host: irc.codetalk.io
@@ -20,6 +21,7 @@ irc:
   #ssl: true  # currently unsupported
   channel: '#lobby'
   timeout: 7
+  auth_timeout: 5:00
 logging:
   active: true
   path: errrors.log

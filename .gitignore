@@ -2,3 +2,5 @@
 *.pyc
 *.sublime-*
 *.db
+users.json
+errors.log

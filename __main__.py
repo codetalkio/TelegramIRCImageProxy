@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from collections import defaultdict
 from datetime import datetime
 from functools import partial
 import logging
@@ -8,7 +9,7 @@ import os
 from string import Template
 import sys
 import tempfile
-from threading import Thread
+from threading import Lock, Thread
 import time
 
 import asyncirc
@@ -18,10 +19,12 @@ from twx import botapi
 
 import config
 from models.image import ImageInfo, ImageDatabase
+from models.user import UserDatabase
+from util import wrap, randomstr
 
 
 CONFIG_FILE = "config.yaml"
-IMAGE_EXTENSIONS = (".jpg", ".png", ".gif")
+IMAGE_EXTENSIONS = ('.jpg', '.png', '.gif')
 
 l = logging.getLogger(__name__)
 
@@ -30,12 +33,21 @@ l = logging.getLogger(__name__)
 
 
 class TelegramImageBot(botapi.TelegramBot):
+    _command_handlers = defaultdict(list)
 
     def __init__(self, conf, on_image=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._offset = None
         self.conf = conf
         self.on_image = on_image
+
+    # @command('cmdname') decorator
+    @classmethod
+    def command(cls, name):
+        def decorator(func):
+            cls._command_handlers[name].append(func)
+            return func
+        return decorator
 
     @staticmethod
     def build_name(user):
@@ -62,7 +74,7 @@ class TelegramImageBot(botapi.TelegramBot):
             # Out data storage object
             img = ImageInfo(f_id=None,
                             time=message.date,
-                            username=message.sender.username,
+                            username=None,
                             c_id=message.chat.id, m_id=message.message_id,
                             caption=message.caption, ext='.jpg',
                             remote_path=None, local_path=None, url=None, finished=False)
@@ -70,7 +82,7 @@ class TelegramImageBot(botapi.TelegramBot):
             if message.document:
                 # Check for image mime types
                 mime_type = message.document.mime_type
-                l.info("received document from {0.sender.username}: {0.document}", message)
+                l.info("received document from {0.sender}: {0.document}", message)
                 if mime_type:
                     ext = mimetypes.guess_extension(mime_type)
                     l.debug("guessed extension '{}' from MIME-type '{}'", ext, mime_type)
@@ -82,8 +94,8 @@ class TelegramImageBot(botapi.TelegramBot):
                         self.send_message(message.chat.id, "I do not know how to handle that")
 
             elif message.photo:
-                l.info("received photo from {1} ({0.sender.id}): {0.photo}",
-                       message, self.build_name(message.sender))
+                l.info("received photo from {0.sender}: {0.photo}",
+                       message)
                 sorted_photo = sorted(message.photo, key=lambda p: p.file_size)
                 if sorted_photo != message.photo:
                     l.critical("PhotoSizes were not sorted by size; {}", message)
@@ -93,9 +105,7 @@ class TelegramImageBot(botapi.TelegramBot):
                 self.on_image(img)
 
             elif message.text:
-                l.info("received text from {1} ({0.sender.id}): {0.text}",
-                       message, self.build_name(message.sender))
-                self.send_message(message.chat.id, "Just send me photos or images")
+                self.on_text(message)
 
             else:
                 l.warn("didn't handle update: {}", update)
@@ -103,6 +113,22 @@ class TelegramImageBot(botapi.TelegramBot):
 
             if not self.offset or upd_id >= self.offset:
                 self.offset = upd_id + 1
+
+    def on_text(self, message):
+        l.info("received text from {0.sender}: {0.text!r}", message)
+
+        # check if this is a command
+        if message.text.startswith("/"):
+            cmd, *args = message.text[1:].split()
+            cmd, _, botname = cmd.partition("@")
+            if botname and botname != self.username:
+                return
+            for func in self._command_handlers[cmd]:
+                if func(self, args, message):
+                    break
+        else:
+            self.send_message(message.chat.id,
+                              "Just send me photos or images or type /help for a list of commands")
 
     def handle_error(self, error):
         l.error("failed to fetch data; {}", error)
@@ -127,11 +153,73 @@ class TelegramImageBot(botapi.TelegramBot):
             ).wait()
 
 
-class MyIRCClient(asyncirc.IRCClient):
+# Add text commands (how2decorator in class)
+@TelegramImageBot.command('start')
+def cmd_start(self, args, message):
+    msg = wrap("""
+        Authenticate yourself via /auth and follow the instructions.
+        Afterwards you can send me photos or images,
+        which I will upload
+        and link to in the IRC channel
+        {conf.irc.channel} on {conf.irc.host}.
+    """).format(conf=self.conf)
+    self.send_message(message.chat.id, msg)
+
+
+TelegramImageBot.command('help')(cmd_start)
+
+
+@TelegramImageBot.command('auth')
+def cmd_auth(self, args, message):
+    self.on_auth(message)
+
+
+###############################################################################
+
+
+class MyIRCClient(asyncirc.IRCBot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._connected = False
 
+        self._connected = False
+        self.auth_map = {}
+        self._auth_map_lock = Lock()
+
+        self.on_chanmsg(self.__class__.on_msg_command)
+
+    def new_auth_callback(self, callback, authcode=None):
+        with self._auth_map_lock:
+            while not authcode or authcode in self.auth_map:
+                authcode = randomstr(10)
+            l.debug("added authcode callback for: {}", authcode)
+            self.auth_map[authcode] = callback
+        return authcode
+
+    def remove_auth_callback(self, authcode):
+        with self._auth_map_lock:
+            l.debug("removed authcode callback for: {}", authcode)
+            del self.auth_map[authcode]
+
+    def on_msg_command(self, nick, host, channel, message):
+        _, _, text = message.partition(self.nick)
+        if not text:
+            return
+        _, command, *args = text.split(" ")  # also strips ": " after nick
+        print(command, args)
+        if command == 'auth':
+            l.info("auth attempt on IRC from {0[nick]} with {0[args]}", locals())
+            with self._auth_map_lock:
+                cb = self.auth_map.get(args[0])
+                if cb:
+                    l.debug("calling callback {1} for authcode: {0}", args[0], cb)
+                    cb(args[1] if len(args) > 1 else nick)
+                else:
+                    l.info("no such authcode record: {}", args[0])
+        else:
+            self.msg(channel, "{nick}: Unknown command".format())
+            l.info("unknown IRC command message from {0[nick]}: {0[command]} {0[args]}", locals())
+
+    # Check for successful connection and auto-rename if nick already in use
     def _process_data(self, line):
         try:
             code = int(line.split()[1])
@@ -158,12 +246,16 @@ class MyIRCClient(asyncirc.IRCClient):
             return False
 
 
+###############################################################################
+
+
 class ImageReceivedThread(Thread):
-    def __init__(self, conf, irc_bot, tg_bot, img, *args, **kwargs):
+    def __init__(self, conf, irc_bot, tg_bot, user_db, img, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conf = conf
         self.irc_bot = irc_bot
         self.tg_bot = tg_bot
+        self.user_db = user_db
         self.img = img
 
     def reply(self, msg):
@@ -172,10 +264,21 @@ class ImageReceivedThread(Thread):
             msg,
             disable_web_page_preview=True,
             reply_to_message_id=self.img.m_id,
-            on_success=partial(l.info, "sent message to {0.chat.username} ({0.chat.id}): {0.text}")
+            on_success=partial(l.info, "sent message to {0.chat}: {0.text}")
         )
 
     def run(self):
+        # Check if user may send images at all
+        if self.img.c_id in self.user_db.blacklist:
+            l.info("discarding image from blacklisted user {}", self.img.c_id)
+            return
+        if str(self.img.c_id) not in self.user_db.name_map:  # JSON only has string keys
+            self.reply("You need to authenticate via /auth before sending pictures")
+            l.info("discarding image from unauthorized user {}", self.img.c_id)
+            return
+
+        self.img = self.img._replace(username=self.user_db.name_map[str(self.img.c_id)])
+
         # Show that we're doing something
         self.tg_bot.send_chat_action(self.img.c_id, botapi.ChatAction.PHOTO)
 
@@ -298,6 +401,74 @@ class ImageReceivedThread(Thread):
 ###############################################################################
 
 
+class AuthThread(Thread):
+    def __init__(self, conf, irc_bot, tg_bot, user_db, message, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.conf = conf
+        self.irc_bot = irc_bot
+        self.tg_bot = tg_bot
+        self.user_db = user_db
+        self.message = message
+
+        self.authenticated = False
+
+    def do_authentication(self, name):
+        if self.authenticated:
+            return
+
+        self.user_db.add_to_name_map(self.message.sender.id, name)
+
+        self.irc_bot.msg(self.conf.irc.channel, "{}: Authentication successful.".format(name))
+        self.tg_bot.send_message(self.message.chat.id, "Authenticated as {}.".format(name))
+        l.info("{0} authenticated as {1.sender}", name, self.message)
+
+        self.authenticated = True
+
+    def run(self):
+        # Create unused authcode and register callback
+        authcode = self.irc_bot.new_auth_callback(self.do_authentication)
+
+        msg = wrap("""
+            Your Authcode is: {authcode}
+
+            Within {conf.irc.auth_timeout}s,
+            send "{conf.irc.nick} auth {authcode}" in
+            {conf.irc.channel} on {conf.irc.host}
+            with your usual nickname.
+            If you want the bot to use a different name
+            than your current IRC name,
+            add an additional argument which will be stored instead
+            (for the slack <-> IRC proxy).
+
+            Example: "{conf.irc.nick} auth {authcode} my_actual_name"
+
+            You can re-authenticate any time
+            to overwrite the stored nick.
+        """).format(conf=self.conf, authcode=authcode)
+        self.tg_bot.send_message(self.message.chat.id, msg)
+
+        # Register callback ...
+        l.info("initiated authentication for {0.sender}, authcode: {1}",
+               self.message, authcode)
+
+        # ... and wait until do_authentication gets called, or timeout
+        start_time = time.time()
+        while (
+            not self.authenticated
+            and time.time() < start_time + (self.conf.irc.auth_timeout or 3000)
+        ):
+            time.sleep(0.5)
+
+        # Finish thread
+        if not self.authenticated:
+            l.info("authentication timed out for {0.sender}", self.message)
+            self.tg_bot.send_message(self.message.chat.id, "Authentication timed out")
+        self.irc_bot.remove_auth_callback(authcode)
+
+
+###############################################################################
+
+
 def verify_config(conf):
     if not conf.telegram.token:
         l.critical("no telegram token found")
@@ -372,6 +543,9 @@ def main():
     if not verify_config(conf):
         return 2
 
+    # Load user database
+    user_db = UserDatabase(conf.storage.user_database or "users.json")
+
     # Start IRC bot
     irc_bot = MyIRCClient(
         host=conf.irc.host,
@@ -384,7 +558,6 @@ def main():
     if not irc_bot.wait_connected(conf.irc.timeout or 7):
         l.critical("Couldn't connect to IRC")
         return 3
-    # Don't need to join channel because chanmode 'n' is not set
     irc_bot.join(conf.irc.channel)
 
     # Start Telegram bot
@@ -398,12 +571,28 @@ def main():
             conf=conf,
             irc_bot=irc_bot,
             tg_bot=tg_bot,
+            user_db=user_db,
             img=img
         )
         thread.start()
         return thread
 
     tg_bot.on_image = on_image
+
+    # Register image callback as a closure
+    def on_auth(message):
+        nonlocal conf, irc_bot, tg_bot
+        thread = AuthThread(
+            conf=conf,
+            irc_bot=irc_bot,
+            tg_bot=tg_bot,
+            user_db=user_db,
+            message=message
+        )
+        thread.start()
+        return thread
+
+    tg_bot.on_auth = on_auth
 
     # Go through backlog and reschedule failed image uploads
     if conf.storage.database:
