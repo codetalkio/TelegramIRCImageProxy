@@ -2,7 +2,7 @@
 
 A [Telegram](http://telegram.me/) bot 
 that accepts photos (and images), 
-uploads them to imgur.com
+uploads them to <http://imgur.com>
 and posts the URL to an IRC channel.
 Intended for quickly sharing images from mobile phones.
 
@@ -10,6 +10,7 @@ Reference configuration:
 Send photos or image files to https://telegram.me/codetalkircbot
 and they will be posted 
 in [#lobby on irc.codetalk.io](irc://irc.codetalk.io/lobby).
+You need to authenticate before however.
 
 
 ## Installation
@@ -17,8 +18,6 @@ in [#lobby on irc.codetalk.io](irc://irc.codetalk.io/lobby).
 ```
 pip install -r requirements.txt
 ```
-
-**Important!** Currently, a custom version of https://github.com/datamachine/twx.botapi is required, which is based on my unmerged pull requests to it.
 
 ### Configuration
 
@@ -55,7 +54,11 @@ The following keys are required:
 
 ## Usage
 
-Just run `python __main__.py`.
+Just run
+```
+python __main__.py
+```
+.
 
 
 ## Features
@@ -68,3 +71,5 @@ Just run `python __main__.py`.
   on the next restart 
   without re-downloading the file,
   for example.
+- Users on Telegram have to authenticate in the IRC channel
+  in order to be able to proxy images through the bot.
