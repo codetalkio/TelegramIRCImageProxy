@@ -13,9 +13,6 @@ import tempfile
 from threading import Thread
 import time
 
-# Required to use my up2date fork
-sys.path.insert(0, R"E:\Development\Python\twx.botapi")
-
 import asyncirc
 from imgurpython import ImgurClient
 from imgurpython.helpers.error import ImgurClientError
