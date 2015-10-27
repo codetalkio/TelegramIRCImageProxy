@@ -272,12 +272,12 @@ class ImageReceivedThread(Thread):
         if self.img.c_id in self.user_db.blacklist:
             l.info("discarding image from blacklisted user {}", self.img.c_id)
             return
-        if str(self.img.c_id) not in self.user_db.name_map:  # JSON only has string keys
+        if self.img.c_id not in self.user_db.name_map:
             self.reply("You need to authenticate via /auth before sending pictures")
             l.info("discarding image from unauthorized user {}", self.img.c_id)
             return
 
-        self.img = self.img._replace(username=self.user_db.name_map[str(self.img.c_id)])
+        self.img = self.img._replace(username=self.user_db.name_map[self.img.c_id])
 
         # Show that we're doing something
         self.tg_bot.send_chat_action(self.img.c_id, botapi.ChatAction.PHOTO)
