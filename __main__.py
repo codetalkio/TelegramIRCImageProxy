@@ -107,10 +107,10 @@ class TelegramImageBot(botapi.TelegramBot):
     def handle_error(self, error):
         l.error("failed to fetch data; {}", error)
         # Delay next poll if there was an error
-        time.sleep(self.conf.telegram.timeout)
+        time.sleep(self.conf.telegram.timeout or 5)
 
     def poll_loop(self):
-        timeout = self.conf.telegram.timeout
+        timeout = self.conf.telegram.timeout or 5
         l.info("poll loop initiated with timeout {}", timeout)
 
         i = 0
@@ -140,7 +140,7 @@ class MyIRCClient(asyncirc.IRCClient):
         else:
             if code == 376:  # End of /MOTD command
                 self._connected = True
-                l.info("IRCClient connected")
+                l.info("IRC client connected as {}", self.nick)
             elif code == 433:  # Nickname is already in use
                 self.nick += "_"
                 self.send_raw("NICK {nick}".format(nick=self.nick))
@@ -149,7 +149,7 @@ class MyIRCClient(asyncirc.IRCClient):
 
     def wait_connected(self, timeout=7):
         start = time.time()
-        l.debug("Waiting for IRCClient to connect")
+        l.debug("Waiting for IRC client to connect")
         while time.time() < start + timeout:
             if self._connected:
                 return True
@@ -177,7 +177,7 @@ class ImageReceivedThread(Thread):
 
     def run(self):
         # Show that we're doing something
-        self.send_chat_action(self.img.c_id, botapi.ChatAction.PHOTO)
+        self.tg_bot.send_chat_action(self.img.c_id, botapi.ChatAction.PHOTO)
 
         # Must be created in thread because multi-threading is now allowed
         db = ImageDatabase(self.conf.storage.database) if self.conf.storage.database else None
@@ -214,11 +214,13 @@ class ImageReceivedThread(Thread):
             if self.conf.storage.delete_images:
                 os.remove(self.img.local_path)
                 self.img = self.img._replace(local_path=None)
+
         except Exception as e:
             self.reply("Oops, there was an error. Contact @fichtefoll and run in circles.\n"
                        "Error: " + str(e))
             l.error("Uncaught error in ImageReceivedThread: {}", e)
             raise
+
         finally:
             if db:
                 if not db_img:
@@ -328,7 +330,7 @@ def init_logging(conf, console_level):
                             style='{')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(fmt)
-    # Filter out requests logging, for now
+    # Filter out requests logging
     handler.addFilter(
         lambda r: (not r.name.startswith("requests")) or r.levelno > 20
     )
@@ -385,7 +387,7 @@ def main():
     tg_bot = TelegramImageBot(conf, token=conf.telegram.token)
     l.info("Me: {}", tg_bot.update_bot_info().wait())
 
-    # Register main callback as a closure
+    # Register image callback as a closure
     def on_image(img):
         nonlocal conf, irc_bot, tg_bot
         thread = ImageReceivedThread(
