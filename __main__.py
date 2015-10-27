@@ -347,6 +347,10 @@ def init_logging(conf, console_level):
         handler.setFormatter(fmt)
         conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
         handler.addFilter(lambda r: r.levelno >= conf_level)
+        # Filter out requests logging
+        handler.addFilter(
+            lambda r: (not r.name.startswith("requests")) or r.levelno > 20
+        )
 
         f.write("-- started application; logging level: {}\n".format(conf_level))
         handlers.append(handler)
