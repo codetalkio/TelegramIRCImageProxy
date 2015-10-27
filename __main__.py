@@ -321,8 +321,7 @@ class ImageReceivedThread(Thread):
         except Exception as e:
             self.reply("Oops, there was an error. Contact @fichtefoll and run in circles.\n"
                        "Error: " + str(e))
-            l.error("Uncaught error in ImageReceivedThread: {}", e)
-            raise
+            l.exception("Uncaught exception in ImageReceivedThread: {}", e)
 
         finally:
             if db:
