@@ -37,6 +37,10 @@ class TelegramImageBot(botapi.TelegramBot):
         self.conf = conf
         self.on_image = on_image
 
+    @staticmethod
+    def build_name(user):
+        return user.username or ' '.join(filter([user.first_name, user.last_name]))
+
     @property
     def offset(self):
         return self._offset
@@ -66,10 +70,10 @@ class TelegramImageBot(botapi.TelegramBot):
             if message.document:
                 # Check for image mime types
                 mime_type = message.document.mime_type
-                l.info("Received document from {0.sender.username}: {0.document}", message)
+                l.info("received document from {0.sender.username}: {0.document}", message)
                 if mime_type:
                     ext = mimetypes.guess_extension(mime_type)
-                    l.debug("Guessed extension '{}' from MIME-type '{}'", ext, mime_type)
+                    l.debug("guessed extension '{}' from MIME-type '{}'", ext, mime_type)
                     if ext in IMAGE_EXTENSIONS:
                         # Download document (image file)
                         img = img._replace(ext=ext, f_id=message.document.file_id)
@@ -78,16 +82,21 @@ class TelegramImageBot(botapi.TelegramBot):
                         self.send_message(message.chat.id, "I do not know how to handle that")
 
             elif message.photo:
-                l.info("Received photo from {0.sender.username}: {0.photo}", message)
+                l.info("received photo from {1} ({0.sender.id}): {0.photo}",
+                       message, self.build_name(message.sender))
                 sorted_photo = sorted(message.photo, key=lambda p: p.file_size)
                 if sorted_photo != message.photo:
-                    l.critical("PhotoSizes were not sorted by size; {}", message.photo)
+                    l.critical("PhotoSizes were not sorted by size; {}", message)
 
                 # Download the file (always jpg)
                 img = img._replace(f_id=sorted_photo[-1].file_id)
                 self.on_image(img)
+
             elif message.text:
+                l.info("received text from {1} ({0.sender.id}): {0.text}",
+                       message, self.build_name(message.sender))
                 self.send_message(message.chat.id, "Just send me photos or images")
+
             else:
                 l.warn("didn't handle update: {}", update)
                 self.send_message(message.chat.id, "I do not know how to handle that")
@@ -163,7 +172,7 @@ class ImageReceivedThread(Thread):
             msg,
             disable_web_page_preview=True,
             reply_to_message_id=self.img.m_id,
-            on_success=partial(l.info, "sent message | {}")
+            on_success=partial(l.info, "sent message to {0.chat.username} ({0.chat.id}): {0.text}")
         )
 
     def run(self):
@@ -304,7 +313,7 @@ def verify_config(conf):
         return True
 
 
-def init_logging(conf, level):
+def init_logging(conf, console_level):
     class NewStyleLogRecord(logging.LogRecord):
         def getMessage(self):
             msg = self.msg
@@ -331,15 +340,17 @@ def init_logging(conf, level):
             "| {asctime} | {levelname:^8} | {message} (from {name}; {threadName})",
             style='{'
         )
-        handler = logging.StreamHandler(open(conf.logging.path or "errors.log", "a"))
+        f = open(conf.logging.path or "errors.log", "a")
+        handler = logging.StreamHandler(f)
         handler.setFormatter(fmt)
         conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
         handler.addFilter(lambda r: r.levelno >= conf_level)
 
+        f.write("-- started application; logging level: {}\n".format(conf_level))
         handlers.append(handler)
 
-    logging.basicConfig(level=level, handlers=handlers)
-    print("-- logging level: {}".format(l.getEffectiveLevel()))
+    logging.basicConfig(level=console_level, handlers=handlers)
+    print("-- console logging level: {}".format(l.getEffectiveLevel()))
 
 
 ###############################################################################
@@ -348,8 +359,8 @@ def init_logging(conf, level):
 def main():
     # Read config, init logging
     conf = config.read_file(CONFIG_FILE)
-    init_logging(conf=conf, level=logging.INFO)
-    l.info("config: {!s}", config)
+    init_logging(conf=conf, console_level=logging.INFO)
+    l.info("config: {!s}", conf)
 
     # Verify other config
     if not verify_config(conf):
