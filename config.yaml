@@ -17,13 +17,13 @@ storage:
 irc:
   nick: TelegramBot
   host: irc.codetalk.io
-  #port: 6697
+  port: 6667
   #ssl: true  # currently unsupported
   channel: '#lobby'
   timeout: 7
   auth_timeout: 5:00
 logging:
   active: true
-  path: errrors.log
-  level: WARN
+  path: errors.log
+  level: INFO
 ...
