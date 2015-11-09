@@ -226,7 +226,8 @@ class MyIRCClient(asyncirc.IRCBot):
         except:
             pass
         else:
-            if code == 376:  # End of /MOTD command
+            # Previously used 376 End of /MOTD command, but not all ircds send this
+            if code == 266:  # Current global users
                 self._connected = True
                 l.info("IRC client connected as {}", self.nick)
             elif code == 433:  # Nickname is already in use
