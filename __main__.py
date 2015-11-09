@@ -432,7 +432,7 @@ class AuthThread(Thread):
             Your Authcode is: {authcode}
 
             Within {conf.irc.auth_timeout}s,
-            send "{conf.irc.nick} auth {authcode}" in
+            send "{nick} auth {authcode}" in
             {conf.irc.channel} on {conf.irc.host}
             with your usual nickname.
             If you want the bot to use a different name
@@ -440,11 +440,11 @@ class AuthThread(Thread):
             add an additional argument which will be stored instead
             (for the slack <-> IRC proxy).
 
-            Example: "{conf.irc.nick} auth {authcode} my_actual_name"
+            Example: "{nick} auth {authcode} my_actual_name"
 
             You can re-authenticate any time
             to overwrite the stored nick.
-        """).format(conf=self.conf, authcode=authcode)
+        """).format(conf=self.conf, authcode=authcode, nick=self.irc_bot.nick)
         self.tg_bot.send_message(self.message.chat.id, msg)
 
         # Register callback ...
