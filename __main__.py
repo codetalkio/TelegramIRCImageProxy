@@ -496,10 +496,11 @@ def init_logging(conf, console_level):
             return msg.rstrip().format(*self.args)
     logging.setLogRecordFactory(NewStyleLogRecord)
 
-    fmt = logging.Formatter("| {levelname:^8} | {message} (from {name}; {threadName})",
-                            style='{')
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(fmt)
+    handler.setFormatter(logging.Formatter(
+        "| {levelname:^8} | {message} (from {name}; {threadName})",
+        style='{'
+    ))
     # Filter out requests logging
     handler.addFilter(
         lambda r: (not r.name.startswith("requests")) or r.levelno > 20
@@ -509,21 +510,21 @@ def init_logging(conf, console_level):
     handlers = [handler]
 
     if conf.logging.active:
-        fmt = logging.Formatter(
+        conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
+        f = open(conf.logging.path or "errors.log", "a")
+        f.write("-- started application; logging level: {}\n".format(conf_level))
+
+        handler = logging.StreamHandler(f)
+        handler.setFormatter(logging.Formatter(
             "| {asctime} | {levelname:^8} | {message} (from {name}; {threadName})",
             style='{'
-        )
-        f = open(conf.logging.path or "errors.log", "a")
-        handler = logging.StreamHandler(f)
-        handler.setFormatter(fmt)
-        conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
+        ))
         handler.addFilter(lambda r: r.levelno >= conf_level)
         # Filter out requests logging
         handler.addFilter(
             lambda r: (not r.name.startswith("requests")) or r.levelno > 20
         )
 
-        f.write("-- started application; logging level: {}\n".format(conf_level))
         handlers.append(handler)
 
     logging.basicConfig(level=min(console_level, conf_level), handlers=handlers)
@@ -536,7 +537,7 @@ def init_logging(conf, console_level):
 def main():
     # Read config, init logging
     conf = config.read_file(CONFIG_FILE)
-    init_logging(conf=conf, console_level=logging.INFO)
+    init_logging(conf=conf, console_level=logging.DEBUG)
     l.info("config: {!s}", conf)
 
     # Verify other config
