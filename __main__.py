@@ -504,6 +504,7 @@ def init_logging(conf, console_level):
     handler.addFilter(
         lambda r: (not r.name.startswith("requests")) or r.levelno > 20
     )
+    handler.addFilter(lambda r: r.levelno >= console_level)
 
     handlers = [handler]
 
@@ -525,7 +526,7 @@ def init_logging(conf, console_level):
         f.write("-- started application; logging level: {}\n".format(conf_level))
         handlers.append(handler)
 
-    logging.basicConfig(level=console_level, handlers=handlers)
+    logging.basicConfig(level=min(console_level, conf_level), handlers=handlers)
     print("-- console logging level: {}".format(l.getEffectiveLevel()))
 
 
