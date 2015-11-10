@@ -214,9 +214,10 @@ class MyIRCClient(asyncirc.IRCBot):
                     l.debug("calling callback {1} for authcode: {0}", args[0], cb)
                     cb(args[1] if len(args) > 1 else nick)
                 else:
+                    self.msg(channel, "{}: Auth code invalid".format(nick))
                     l.info("no such authcode record: {}", args[0])
         else:
-            self.msg(channel, "{nick}: Unknown command".format())
+            self.msg(channel, "{}: Unknown command".format(nick))
             l.info("unknown IRC command message from {0[nick]}: {0[command]} {0[args]}", locals())
 
     # Check for successful connection and auto-rename if nick already in use
