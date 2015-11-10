@@ -118,7 +118,7 @@ class TelegramImageBot(botapi.TelegramBot):
         l.info("received text from {0.sender}: {0.text!r}", message)
 
         # check if this is a command
-        if message.text.startswith("/"):
+        if message.text.startswith("/") and len(message.text) > 1:
             cmd, *args = message.text[1:].split()
             cmd, _, botname = cmd.partition("@")
             if botname and botname != self.username:
