@@ -19,7 +19,7 @@ class Config(dict):
             if hasattr(items, 'items'):
                 items = list(items.items())
             for i, (k, v) in enumerate(items):
-                items[i] = (k, _replace_with_type(dict, Config, v))
+                items[i] = (k, _replace_with_type(dict, self.__class__, v))
             super().__init__(items)
         else:
             super().__init__()
@@ -28,7 +28,7 @@ class Config(dict):
         if key in self:
             return self[key]
         else:
-            l.warn("AttrDict: did not find key '{}' in keys {}", key, self.keys())
+            l.warn("AttrDict: did not find key '{}' in {}", key, self.keys())
 
             if l.getEffectiveLevel() <= logging.INFO:
                 import inspect
@@ -39,7 +39,7 @@ class Config(dict):
                            info, info[4][-1].strip())
                 l.info("-- AttrDict stack -- end")
 
-            return Config()  # return empty 'dict' as default
+            return self.__class__()  # return empty 'Config' as default
 
 
 def read_file(filename):
