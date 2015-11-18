@@ -1,251 +1,29 @@
 #!/usr/bin/env python3
 
-from collections import defaultdict
 from datetime import datetime
 from functools import partial
 import logging
-import mimetypes
 import os
 from string import Template
 import sys
 import tempfile
-from threading import Lock, Thread
+from threading import Thread
 import time
 
-import asyncirc
 from imgurpython import ImgurClient
 from imgurpython.helpers.error import ImgurClientError
 from twx import botapi
 
+from bots import IRCBot, TelegramImageBot
 import config
-from models.image import ImageInfo, ImageDatabase
+from models.image import ImageDatabase
 from models.user import UserDatabase
-from util import wrap, randomstr
+from util import wrap
 
 
 CONFIG_FILE = "config.yaml"
-IMAGE_EXTENSIONS = ('.jpg', '.png', '.gif')
 
 l = logging.getLogger(__name__)
-
-
-###############################################################################
-
-
-class TelegramImageBot(botapi.TelegramBot):
-    _command_handlers = defaultdict(list)
-
-    def __init__(self, conf, on_image=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._offset = None
-        self.conf = conf
-        self.on_image = on_image
-
-    # @command('cmdname') decorator
-    @classmethod
-    def command(cls, name):
-        def decorator(func):
-            cls._command_handlers[name].append(func)
-            return func
-        return decorator
-
-    @staticmethod
-    def build_name(user):
-        return user.username or ' '.join(filter([user.first_name, user.last_name]))
-
-    @property
-    def offset(self):
-        return self._offset
-
-    @offset.setter
-    def offset(self, offset):
-        l.info("new offset: {}", offset)
-        self._offset = offset
-
-    def handle_updates(self, updates):
-        if not updates:
-            return
-
-        for update in updates:
-            upd_id, message = update.update_id, update.message
-
-            l.debug("handling update: {}", update)
-
-            # Out data storage object
-            img = ImageInfo(f_id=None,
-                            time=message.date,
-                            username=None,
-                            c_id=message.chat.id, m_id=message.message_id,
-                            caption=message.caption, ext='.jpg',
-                            remote_path=None, local_path=None, url=None, finished=False)
-
-            if message.document:
-                # Check for image mime types
-                mime_type = message.document.mime_type
-                l.info("received document from {0.sender}: {0.document}", message)
-                if mime_type:
-                    ext = mimetypes.guess_extension(mime_type)
-                    l.debug("guessed extension '{}' from MIME-type '{}'", ext, mime_type)
-                    if ext in IMAGE_EXTENSIONS:
-                        # Download document (image file)
-                        img = img._replace(ext=ext, f_id=message.document.file_id)
-                        self.on_image(img)
-                    else:
-                        self.send_message(message.chat.id, "I do not know how to handle that")
-
-            elif message.photo:
-                l.info("received photo from {0.sender}: {0.photo}",
-                       message)
-                sorted_photo = sorted(message.photo, key=lambda p: p.file_size)
-                if sorted_photo != message.photo:
-                    l.critical("PhotoSizes were not sorted by size; {}", message)
-
-                # Download the file (always jpg)
-                img = img._replace(f_id=sorted_photo[-1].file_id)
-                self.on_image(img)
-
-            elif message.text:
-                self.on_text(message)
-
-            else:
-                l.warn("didn't handle update: {}", update)
-                self.send_message(message.chat.id, "I do not know how to handle that")
-
-            if not self.offset or upd_id >= self.offset:
-                self.offset = upd_id + 1
-
-    def on_text(self, message):
-        l.info("received text from {0.sender}: {0.text!r}", message)
-
-        # check if this is a command
-        if message.text.startswith("/") and len(message.text) > 1:
-            cmd, *args = message.text[1:].split()
-            cmd, _, botname = cmd.partition("@")
-            if botname and botname != self.username:
-                return
-            for func in self._command_handlers[cmd]:
-                if func(self, args, message):
-                    break
-        else:
-            self.send_message(message.chat.id,
-                              "Just send me photos or images or type /help for a list of commands")
-
-    def handle_error(self, error):
-        l.error("failed to fetch data; {}", error)
-        # Delay next poll if there was an error
-        time.sleep(self.conf.telegram.timeout or 5)
-
-    def poll_loop(self):
-        timeout = self.conf.telegram.timeout or 5
-        l.info("poll loop initiated with timeout {}", timeout)
-
-        i = 0
-        while True:
-            i += 1
-            l.debug("poll #{}", i)
-
-            # Long polling
-            self.get_updates(
-                timeout=timeout,
-                offset=self.offset,
-                on_success=self.handle_updates,
-                on_error=self.handle_error
-            ).wait()
-
-
-# Add text commands (how2decorator in class)
-@TelegramImageBot.command('start')
-def cmd_start(self, args, message):
-    msg = wrap("""
-        Authenticate yourself via /auth and follow the instructions.
-        Afterwards you can send me photos or images,
-        which I will upload
-        and link to in the IRC channel
-        {conf.irc.channel} on {conf.irc.host}.
-    """).format(conf=self.conf)
-    self.send_message(message.chat.id, msg)
-
-
-TelegramImageBot.command('help')(cmd_start)
-
-
-@TelegramImageBot.command('auth')
-def cmd_auth(self, args, message):
-    self.on_auth(message)
-
-
-###############################################################################
-
-
-class MyIRCClient(asyncirc.IRCBot):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self._connected = False
-        self.auth_map = {}
-        self._auth_map_lock = Lock()
-
-        self.on_chanmsg(self.__class__.on_msg_command)
-
-    def new_auth_callback(self, callback, authcode=None):
-        with self._auth_map_lock:
-            while not authcode or authcode in self.auth_map:
-                authcode = randomstr(10)
-            l.debug("added authcode callback for: {}", authcode)
-            self.auth_map[authcode] = callback
-        return authcode
-
-    def remove_auth_callback(self, authcode):
-        with self._auth_map_lock:
-            l.debug("removed authcode callback for: {}", authcode)
-            del self.auth_map[authcode]
-
-    def on_msg_command(self, nick, host, channel, message):
-        _, _, text = message.partition(self.nick)
-        if not text:
-            return
-        _, command, *args = text.split(" ")  # also strips ": " after nick
-        print(command, args)
-        if command == 'auth':
-            l.info("auth attempt on IRC from {0[nick]} with {0[args]}", locals())
-            with self._auth_map_lock:
-                cb = self.auth_map.get(args[0])
-                if cb:
-                    l.debug("calling callback {1} for authcode: {0}", args[0], cb)
-                    cb(args[1] if len(args) > 1 else nick)
-                else:
-                    self.msg(channel, "{}: Auth code invalid".format(nick))
-                    l.info("no such authcode record: {}", args[0])
-        else:
-            self.msg(channel, "{}: Unknown command".format(nick))
-            l.info("unknown IRC command message from {0[nick]}: {0[command]} {0[args]}", locals())
-
-    # Check for successful connection and auto-rename if nick already in use
-    def _process_data(self, line):
-        try:
-            code = int(line.split()[1])
-        except:
-            pass
-        else:
-            # Previously used 376 End of /MOTD command, but not all ircds send this
-            if code == 266:  # Current global users
-                self._connected = True
-                l.info("IRC client connected as {}", self.nick)
-            elif code == 433:  # Nickname is already in use
-                self.nick += "_"
-                self.send_raw("NICK {nick}".format(nick=self.nick))
-
-        super()._process_data(line)
-
-    def wait_connected(self, timeout=7):
-        start = time.time()
-        l.debug("Waiting for IRC client to connect")
-        while time.time() < start + timeout:
-            if self._connected:
-                return True
-            time.sleep(0.1)
-        else:
-            return False
 
 
 ###############################################################################
@@ -550,7 +328,7 @@ def main():
     user_db = UserDatabase(conf.storage.user_database or "users.json")
 
     # Start IRC bot
-    irc_bot = MyIRCClient(
+    irc_bot = IRCBot(
         host=conf.irc.host,
         port=conf.irc.port or 6667,
         nick=conf.irc.nick or "TelegramBot",
