@@ -4,3 +4,4 @@
 *.db
 users.json
 errors.log
+user_config.yaml

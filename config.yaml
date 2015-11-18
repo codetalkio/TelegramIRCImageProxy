@@ -1,12 +1,14 @@
 %YAML 1.1
 ---
+# You can override all these settings the following file (for easier version control)
+user_config: user_config.yaml
 telegram:
-  token:  # obtain from @BotFather (https://telegram.me/BotFather)
+  token:  # REQUIRED! obtain from @BotFather (https://telegram.me/BotFather)
   timeout: 5
 imgur:
-  client_id:  # obtain https://api.imgur.com/oauth2/addclient
-  client_secret:
-  refresh_token:  # obtain via authenticate_imgur.py
+  client_id:  # REQUIRED! obtain https://api.imgur.com/oauth2/addclient
+  client_secret:  # REQUIRED!
+  refresh_token:  # REQUIRED! obtain via authenticate_imgur.py
   album:
   timestamp_format:
 storage:
@@ -15,11 +17,11 @@ storage:
   database: images.db
   user_database: users.json
 irc:
-  nick: TelegramBot
-  host: irc.codetalk.io
-  port: 6667
+  nick: TelegramBot  # REQUIRED!
+  host: irc.codetalk.io  # REQUIRED!
+  port: 6667  # REQUIRED!
   #ssl: true  # currently unsupported
-  channel: '#lobby'
+  channel: '#lobby'  # REQUIRED!
   timeout: 7
   auth_timeout: 5:00
 logging:
