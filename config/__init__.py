@@ -1,4 +1,5 @@
 import logging
+import os
 
 import yaml
 
@@ -7,7 +8,7 @@ l = logging.getLogger(__name__)
 
 
 def _replace_with_type(type_, replace_type, data):
-    if isinstance(data, type_):
+    if isinstance(data, type_) and not isinstance(data, replace_type):
         return replace_type(data)
     return data
 
@@ -41,10 +42,28 @@ class Config(dict):
 
             return self.__class__()  # return empty 'Config' as default
 
+    def update(self, other=None):
+        if not other:
+            return
+        other = _replace_with_type(dict, self.__class__, other)
+        return super().update(other)
 
-def read_file(filename):
+
+def read_file(filename, consider_user_config=True):
     l.debug("reading config file: '{}'", filename)
     with open(filename) as f:
         config = Config(yaml.safe_load(f))
     l.debug("config: {!s}", config)
+
+    if consider_user_config and config.user_config:
+        if os.path.exists(config.user_config):
+            with open(config.user_config) as f:
+                user_config = Config(yaml.safe_load(f))
+                l.debug("user_config: {!s}", user_config)
+                config.update(user_config)
+
+            l.debug("config with user_config: {!s}", config)
+        else:
+            l.warn("user_config file not found: '{}'", config.user_config)
+
     return config
