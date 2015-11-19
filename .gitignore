@@ -1,6 +1,14 @@
+# virtualenv
 .venv/
+
+# binaries
 *.pyc
+
+# dev-specific files
 *.sublime-*
+stuff.todo
+
+# user-specific app files
 *.db
 users.json
 errors.log
