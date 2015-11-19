@@ -23,6 +23,9 @@ pip install -r requirements.txt
 
 Configuration is saved in `config.yaml`.
 All available keys are pre-inserted, with some comments.
+In order to override these settings with your own,
+you should **create a new file named `user_config.yaml`**
+and follow the same structure.
 
 The following keys are required:
 
@@ -70,6 +73,12 @@ python __main__.py
   This allows to reschedule failed image uploads 
   on the next restart 
   without re-downloading the file,
-  for example.
+  for example,
+  and more.
 - Users on Telegram have to authenticate in the IRC channel
   in order to be able to proxy images through the bot.
+  The bot will then associate the images it posts
+  with the authenticating user's IRC nick name
+  (or any other configurable name),
+  but it won't use names from Telegram.
+- Creates log files for debugging and whatnot.
