@@ -143,9 +143,11 @@ class TelegramImageBot(botapi.TelegramBot):
             ).wait()
 
 
-# Add text commands (how2decorator in class)
+# Add text commands (how2decorator in-class)
+
 @TelegramImageBot.command('start')
 def cmd_start(self, args, message):
+    """/start"""
     return wrap("""
         Authenticate yourself via /auth and follow the instructions.
         Afterwards you can send me photos or images,
@@ -160,5 +162,12 @@ TelegramImageBot.command('help')(cmd_start)
 
 @TelegramImageBot.command('auth')
 def cmd_auth(self, args, message):
+    """/auth"""
     self.on_auth(message)
     return True
+
+
+@TelegramImageBot.command('get_id')
+def cmd_get_id(self, args, message):
+    """/get_id"""
+    return message.sender.id
