@@ -34,7 +34,7 @@ class UserDatabase(object):
     def _write_cache(self):
         if self._user_cache:
             with open(self.path, 'w') as f:
-                json.dump(self._user_cache, f)
+                json.dump(self._user_cache, f, indent=4, sort_keys=True)
 
     @property
     def name_map(self):
