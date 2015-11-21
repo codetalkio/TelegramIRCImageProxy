@@ -111,7 +111,10 @@ class TelegramImageBot(botapi.TelegramBot):
                         self.send_message(message.chat.id,
                                           "You must be an admin to use this command.")
                     continue
-                if func(self, args, message):
+                reply = func(self, args, message)
+                if reply:
+                    if reply is not True:
+                        self.send_message(message.chat.id, reply)
                     break
         else:
             self.send_message(message.chat.id,
@@ -143,14 +146,13 @@ class TelegramImageBot(botapi.TelegramBot):
 # Add text commands (how2decorator in class)
 @TelegramImageBot.command('start')
 def cmd_start(self, args, message):
-    msg = wrap("""
+    return wrap("""
         Authenticate yourself via /auth and follow the instructions.
         Afterwards you can send me photos or images,
         which I will upload
         and link to in the IRC channel
         {conf.irc.channel} on {conf.irc.host}.
     """).format(conf=self.conf)
-    self.send_message(message.chat.id, msg)
 
 
 TelegramImageBot.command('help')(cmd_start)
@@ -159,3 +161,4 @@ TelegramImageBot.command('help')(cmd_start)
 @TelegramImageBot.command('auth')
 def cmd_auth(self, args, message):
     self.on_auth(message)
+    return True
