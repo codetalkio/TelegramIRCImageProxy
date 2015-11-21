@@ -25,9 +25,9 @@ class TelegramImageBot(botapi.TelegramBot):
 
     # @command('cmdname') decorator
     @classmethod
-    def command(cls, name):
+    def command(cls, name, admin=False):
         def decorator(func):
-            cls._command_handlers[name].append(func)
+            cls._command_handlers[name].append((func, admin))
             return func
         return decorator
 
@@ -105,7 +105,12 @@ class TelegramImageBot(botapi.TelegramBot):
             cmd, _, botname = cmd.partition("@")
             if botname and botname != self.username:
                 return
-            for func in self._command_handlers[cmd]:
+            for func, admin in self._command_handlers[cmd]:
+                if admin:
+                    if message.sender.id not in (self.conf.telegram.admin or []):
+                        self.send_message(message.chat.id,
+                                          "You must be an admin to use this command.")
+                    continue
                 if func(self, args, message):
                     break
         else:

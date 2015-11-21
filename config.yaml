@@ -4,6 +4,7 @@
 user_config: user_config.yaml
 telegram:
   token:  # REQUIRED! obtain from @BotFather (https://telegram.me/BotFather)
+  admin: []  # List of Telegram IDs that are allowed to use admin commands
   timeout: 5
 imgur:
   client_id:  # REQUIRED! obtain https://api.imgur.com/oauth2/addclient
