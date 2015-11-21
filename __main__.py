@@ -56,6 +56,7 @@ def init_logging(conf, console_level):
 
     handlers = [handler]
 
+    conf_level = console_level
     if conf.logging.active:
         conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
         f = open(conf.logging.path or "errors.log", "a")
