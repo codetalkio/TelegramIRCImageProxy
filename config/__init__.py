@@ -46,7 +46,21 @@ class Config(dict):
         if not other:
             return
         other = _replace_with_type(dict, self.__class__, other)
-        return super().update(other)
+        if not isinstance(other, self.__class__):
+            l.error("Config.update called with a non-dict or non-Config object")
+            return
+
+        for k, v in other.items():
+            if isinstance(v, self.__class__):
+                if not isinstance(self.get(k), self.__class__):
+                    l.warn("Attempted to override {} instance with {} type",
+                           self.__class__, type(v))
+                    continue
+                else:
+                    self[k].update(v)
+            else:
+                self[k] = v
+        return
 
 
 def read_file(filename, consider_user_config=True):
