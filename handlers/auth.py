@@ -27,7 +27,7 @@ class AuthHandler(BaseHandler):
 
         self.irc_bot.msg(self.conf.irc.channel, "{}: Authentication successful.".format(name))
         self.tg_bot.send_message(self.message.chat.id, "Authenticated as {}.".format(name))
-        l.info("{0} authenticated as {1.sender}", name, self.message)
+        l.info("{1.sender} authenticated as '{0}'", name, self.message)
 
         self.authenticated = True
 
