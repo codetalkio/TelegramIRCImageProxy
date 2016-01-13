@@ -63,9 +63,9 @@ class TelegramImageBot(botapi.TelegramBot):
                             remote_path=None, local_path=None, url=None, finished=False)
 
             if message.document:
+                l.info("received document from {0.sender}: {0.document}", message)
                 # Check for image mime types
                 mime_type = message.document.mime_type
-                l.info("received document from {0.sender}: {0.document}", message)
                 if mime_type:
                     ext = mimetypes.guess_extension(mime_type)
                     l.debug("guessed extension '{}' from MIME-type '{}'", ext, mime_type)
@@ -74,7 +74,10 @@ class TelegramImageBot(botapi.TelegramBot):
                         img = img._replace(ext=ext, f_id=message.document.file_id)
                         self.on_image(img)
                     else:
+                        l.warn("cannot handle MIME-type {}", mime_type)
                         self.send_message(message.chat.id, "I do not know how to handle that")
+                else:
+                    l.warn("no MIME-type detected; {0.document}", message)
 
             elif message.photo:
                 l.info("received photo from {0.sender}: {0.photo}",
