@@ -3,9 +3,7 @@ from functools import partial
 import logging
 import os
 from string import Template
-from threading import Thread
 import tempfile
-
 
 from imgurpython import ImgurClient
 from imgurpython.helpers.error import ImgurClientError
@@ -13,11 +11,13 @@ from twx import botapi
 
 from models.image import ImageDatabase
 
+from . import BaseHandler
+
 
 l = logging.getLogger(__name__)
 
 
-class ImageHandler(Thread):
+class ImageHandler(BaseHandler):
     def __init__(self, conf, irc_bot, tg_bot, user_db, img, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conf = conf
@@ -35,7 +35,7 @@ class ImageHandler(Thread):
             on_success=partial(l.info, "sent message to {0.chat}: {0.text}")
         )
 
-    def run(self):
+    def run_(self):
         # Check if user may send images at all
         if self.img.c_id in self.user_db.blacklist:
             l.info("discarding image from blacklisted user {}", self.img.c_id)

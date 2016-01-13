@@ -1,14 +1,14 @@
 import logging
-from threading import Thread
 import time
 
 from util import wrap
 
+from . import BaseHandler
 
 l = logging.getLogger(__name__)
 
 
-class AuthHandler(Thread):
+class AuthHandler(BaseHandler):
     def __init__(self, conf, irc_bot, tg_bot, user_db, message, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conf = conf
@@ -31,7 +31,7 @@ class AuthHandler(Thread):
 
         self.authenticated = True
 
-    def run(self):
+    def run_(self):
         # Create unused authcode and register callback
         authcode = self.irc_bot.new_auth_callback(self.do_authentication)
 
