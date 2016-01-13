@@ -24,8 +24,9 @@ class UserDatabase(object):
                     l.exception("Unable to read user cache; {}", e)
 
                 # convert keys to integers because JSON can't do that
-                blacklist = data.get('blacklist', {})
-                self._user_cache = {int(k): v for k, v in blacklist.items()}
+                name_map = data.get('name_map', {})
+                name_map = {int(k): v for k, v in name_map.items()}
+                self._user_cache = dict(name_map=name_map, blacklist=data.get('blacklist', []))
 
             l.debug("found {} mapped users", len(self._user_cache['name_map']))
             l.debug("found {} blacklisted users", len(self._user_cache['blacklist']))
