@@ -110,12 +110,12 @@ def main():
     irc_bot.join(conf.irc.channel)
 
     # Start Telegram bot
-    tg_bot = TelegramImageBot(conf, token=conf.telegram.token)
+    tg_bot = TelegramImageBot(conf, user_db, token=conf.telegram.token)
     l.info("Me: {}", tg_bot.update_bot_info().wait())
 
     # Register image callback as a closure
     def on_image(img):
-        nonlocal conf, irc_bot, tg_bot
+        nonlocal conf, irc_bot, tg_bot, user_db
         thread = ImageHandler(
             conf=conf,
             irc_bot=irc_bot,
@@ -130,7 +130,7 @@ def main():
 
     # Register image callback as a closure
     def on_auth(message):
-        nonlocal conf, irc_bot, tg_bot
+        nonlocal conf, irc_bot, tg_bot, user_db
         thread = AuthHandler(
             conf=conf,
             irc_bot=irc_bot,
