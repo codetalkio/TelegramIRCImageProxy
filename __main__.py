@@ -105,8 +105,9 @@ def main():
     )
     irc_bot.start()
     if not irc_bot.wait_connected(conf.irc.timeout or 7):
-        l.critical("Couldn't connect to IRC")
+        l.critical("couldn't connect to IRC")
         return 3
+    l.info("connected to IRC")
     irc_bot.join(conf.irc.channel)
 
     # Start Telegram bot
