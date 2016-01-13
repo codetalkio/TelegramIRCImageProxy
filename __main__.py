@@ -155,7 +155,14 @@ def main():
             l.info("Finished backlog")
 
     # Main loop
-    tg_bot.poll_loop()
+    try:
+        tg_bot.poll_loop()
+    except KeyboardInterrupt:
+        print("user interrupt...")
+    finally:
+        logging.log(logging.ERROR + 1, "shutting down")
+        irc_bot.stop()
+
 
 if __name__ == '__main__':
     sys.exit(main())
