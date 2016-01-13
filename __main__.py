@@ -4,6 +4,8 @@ import logging
 import logging.handlers
 import sys
 
+from colorstreamhandler import ColorStreamHandler
+
 from bots import IRCBot, TelegramImageBot
 import config
 from handlers import AuthHandler, ImageHandler
@@ -48,7 +50,7 @@ def init_logging(conf, console_level):
             return msg.rstrip().format(*self.args)
     logging.setLogRecordFactory(NewStyleLogRecord)
 
-    handler = logging.StreamHandler(sys.stdout)
+    handler = ColorStreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter(CONSOLE_FMT, style='{'))
     handler.addFilter(
         # Filter out requests logging
