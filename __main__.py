@@ -159,6 +159,8 @@ def main():
         tg_bot.poll_loop()
     except KeyboardInterrupt:
         print("user interrupt...")
+    except:
+        l.exception()
     finally:
         logging.log(logging.ERROR + 1, "shutting down")
         irc_bot.stop()
