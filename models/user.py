@@ -53,3 +53,13 @@ class UserDatabase(object):
         self.name_map.append(id_)
         l.info("added to blacklist: {}", id_)
         self._write_cache()
+        return True
+
+    def remove_from_blacklist(self, id_):
+        if id_ in self.name_map:
+            self.name_map.remove(id_)
+            l.info("removed from blacklist: {}", id_)
+        else:
+            l.info("attempted to remove {} from blacklist, but it wasn't there".format(id_))
+        self._write_cache()
+        return True
