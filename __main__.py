@@ -76,10 +76,15 @@ def init_logging(conf, console_level):
         handlers.append(handler)
 
     logging.basicConfig(level=min(console_level, conf_level), handlers=handlers)
-    l.log(logging.ERROR + 1,
+    all_log_level = max(console_level, conf_level) + 1
+
+    l.log(all_log_level,
           "application started; console logging level: {}; file logging level: {}",
           console_level,
           conf_level if conf.logging.active else "disabled")
+
+    # return minimum level required to pass all filters
+    return all_log_level
 
 
 ###############################################################################
@@ -95,7 +100,7 @@ def main():
             console_level = getattr(logging, sys.argv[1].upper(), console_level)
     # Read config and init logging
     conf = config.read_file(CONFIG_FILE)
-    init_logging(conf=conf, console_level=logging.WARN)
+    all_log_level = init_logging(conf=conf, console_level=logging.WARN)
     l.info("config: {!s}", conf)
 
     # Verify other config
@@ -172,7 +177,7 @@ def main():
     except:
         l.exception()
     finally:
-        logging.log(logging.ERROR + 1, "shutting down")
+        logging.log(all_log_level, "shutting down")
         irc_bot.stop()
 
 
