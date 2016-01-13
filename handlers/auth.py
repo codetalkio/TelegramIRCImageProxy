@@ -60,14 +60,13 @@ class AuthHandler(BaseHandler):
 
         # ... and wait until do_authentication gets called, or timeout
         start_time = time.time()
-        while (
-            not self.authenticated
-            and time.time() < start_time + (self.conf.irc.auth_timeout or 3000)
-        ):
+        while time.time() < start_time + (self.conf.irc.auth_timeout or 300):
+            if self.authenticated:
+                break
             time.sleep(0.5)
-
-        # Finish thread
-        if not self.authenticated:
+        else:
             l.info("authentication timed out for {0.sender}", self.message)
             self.tg_bot.send_message(self.message.chat.id, "Authentication timed out")
+
+        # Finish thread
         self.irc_bot.remove_auth_callback(authcode)
