@@ -15,6 +15,7 @@ class BaseHandler(Thread):
             'name',
             "{0.__name__}-{0.thread_num}".format(self.__class__)
         )
+        BaseHandler.thread_num += 1
         super().__init__(*args, **kwargs)
 
     def run(self):
