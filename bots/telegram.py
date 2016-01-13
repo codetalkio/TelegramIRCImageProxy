@@ -133,10 +133,10 @@ class TelegramImageBot(botapi.TelegramBot):
     def handle_error(self, error):
         l.error("failed to fetch data; {}", error)
         # Delay next poll if there was an error
-        time.sleep(self.conf.telegram.timeout or 5)
+        time.sleep(self.conf.telegram.timeout or 60)
 
     def poll_loop(self):
-        timeout = self.conf.telegram.timeout or 5
+        timeout = self.conf.telegram.timeout or 60
         l.info("poll loop initiated with timeout {}", timeout)
 
         i = 0
