@@ -86,9 +86,16 @@ def init_logging(conf, console_level):
 
 
 def main():
-    # Read config, init logging
+    # Determine console logging level from arguments
+    console_level = logging.WARN
+    if len(sys.argv) > 1:
+        if sys.argv[1].isdigit():
+            console_level = int(sys.argv[1])
+        else:
+            console_level = getattr(logging, sys.argv[1].upper(), console_level)
+    # Read config and init logging
     conf = config.read_file(CONFIG_FILE)
-    init_logging(conf=conf, console_level=logging.DEBUG)
+    init_logging(conf=conf, console_level=logging.WARN)
     l.info("config: {!s}", conf)
 
     # Verify other config
