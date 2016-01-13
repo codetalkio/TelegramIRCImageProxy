@@ -145,12 +145,14 @@ class TelegramImageBot(botapi.TelegramBot):
             l.debug("poll #{}", i)
 
             # Long polling
-            self.get_updates(
+            req = self.get_updates(
                 timeout=timeout,
                 offset=self.offset,
                 on_success=self.handle_updates,
                 on_error=self.handle_error
-            ).wait()
+            )
+            while req.thread.is_alive():
+                req.thread.join(1)
 
 
 # Add text commands (how2decorator in-class)
