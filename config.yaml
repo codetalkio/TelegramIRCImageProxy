@@ -29,4 +29,11 @@ logging:
   active: true
   path: log
   level: INFO
+  rotate:
+    # options for log rotating
+    # dict is forwarded to `logging.handlers.TimedRotatingFileHandler` as-is
+    when: midnight
+    interval: 1
+    backupCount: 0
+    encoding: utf-8
 ...

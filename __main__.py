@@ -64,7 +64,8 @@ def init_logging(conf, console_level):
     if conf.logging.active:
         conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
 
-        handler = logging.handlers.RotatingFileHandler(conf.logging.path or "log")
+        handler = logging.handlers.TimedRotatingFileHandler(conf.logging.path or "log",
+                                                            **conf.logging.rotate)
         handler.setFormatter(logging.Formatter(FILE_FMT, style='{'))
         handler.addFilter(
             # Filter out requests logging
