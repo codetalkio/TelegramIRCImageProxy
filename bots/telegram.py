@@ -103,8 +103,17 @@ class TelegramImageBot(botapi.TelegramBot):
         if message.text.startswith("/") and len(message.text) > 1:
             cmd, *args = message.text[1:].split()
             cmd, _, botname = cmd.partition("@")
+
             if botname and botname != self.username:
+                # Command was for another bot (in group chat)
                 return
+
+            if cmd not in self._command_handlers:
+                self.send_message(message.chat.id,
+                                  "Unknown command. Type /help for a list of commands.")
+                l.info("unknown command '{}' from {}", cmd, message.sender)
+                return
+
             for func, admin in self._command_handlers[cmd]:
                 if admin:
                     if message.sender.id not in (self.conf.telegram.admin or []):
