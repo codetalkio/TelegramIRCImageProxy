@@ -158,13 +158,26 @@ class TelegramImageBot(botapi.TelegramBot):
 @TelegramImageBot.command('start')
 def cmd_start(self, args, message):
     """/start"""
-    return wrap("""
+    msg = wrap("""
         Authenticate yourself via /auth and follow the instructions.
         Afterwards you can send me photos or images,
         which I will upload
         and link to in the IRC channel
         {conf.irc.channel} on {conf.irc.host}.
     """).format(conf=self.conf)
+
+    if message.sender.id in (self.conf.telegram.admin or []):
+        msg = msg + "\n\n" + wrap("""
+            More commands:
+
+            /get_id - get your id
+
+            More commands for admins:
+
+            /blacklist [add | remove] <id> - modify the blacklist
+        """)
+
+    return msg
 
 
 TelegramImageBot.command('help')(cmd_start)
