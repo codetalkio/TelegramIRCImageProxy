@@ -38,7 +38,7 @@ class IRCBot(asyncirc.IRCBot):
         if not text:
             return
         _, command, *args = text.split(" ")  # also strips ": " after nick
-        print(command, args)
+        l.debug("IRC command message from {0[nick]}: {0[command]} {0[args]}", locals())
         if command == 'auth':
             l.info("auth attempt on IRC from {0[nick]} with {0[args]}", locals())
             with self._auth_map_lock:
