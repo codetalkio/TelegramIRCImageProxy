@@ -13,7 +13,9 @@ def _replace_with_type(type_, replace_type, data):
     return data
 
 
+# defaultdict is not an option because of recursivity
 class Config(dict):
+    # TODO docstring
 
     def __init__(self, items=None):
         if items is not None:
