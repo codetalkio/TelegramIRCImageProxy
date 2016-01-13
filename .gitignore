@@ -11,5 +11,6 @@ stuff.todo
 # user-specific app files
 *.db
 users.json
-errors.log
+*.log
+log*
 user_config.yaml
