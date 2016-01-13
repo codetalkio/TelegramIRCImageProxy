@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import logging.handlers
 import sys
 
 from bots import IRCBot, TelegramImageBot
@@ -33,6 +34,10 @@ def verify_config(conf):
 
 
 def init_logging(conf, console_level):
+    CONSOLE_FMT = "| {levelname:^8} | {message} (from {name}; {threadName})"
+    FILE_FMT = "| {asctime} " + CONSOLE_FMT
+    handlers = []
+
     class NewStyleLogRecord(logging.LogRecord):
         def getMessage(self):
             msg = self.msg
@@ -44,39 +49,34 @@ def init_logging(conf, console_level):
     logging.setLogRecordFactory(NewStyleLogRecord)
 
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(
-        "| {levelname:^8} | {message} (from {name}; {threadName})",
-        style='{'
-    ))
-    # Filter out requests logging
+    handler.setFormatter(logging.Formatter(CONSOLE_FMT, style='{'))
     handler.addFilter(
-        lambda r: (not r.name.startswith("requests")) or r.levelno > 20
+        # Filter out requests logging
+        lambda r: (not r.name.startswith("requests")) or r.levelno > logging.INFO
     )
     handler.addFilter(lambda r: r.levelno >= console_level)
 
-    handlers = [handler]
+    handlers.append(handler)
 
     conf_level = console_level
     if conf.logging.active:
         conf_level = getattr(logging, (conf.logging.level or "WARN").upper())
-        f = open(conf.logging.path or "errors.log", "a")
-        f.write("-- started application; logging level: {}\n".format(conf_level))
 
-        handler = logging.StreamHandler(f)
-        handler.setFormatter(logging.Formatter(
-            "| {asctime} | {levelname:^8} | {message} (from {name}; {threadName})",
-            style='{'
-        ))
-        handler.addFilter(lambda r: r.levelno >= conf_level)
-        # Filter out requests logging
+        handler = logging.handlers.RotatingFileHandler(conf.logging.path or "log")
+        handler.setFormatter(logging.Formatter(FILE_FMT, style='{'))
         handler.addFilter(
-            lambda r: (not r.name.startswith("requests")) or r.levelno > 20
+            # Filter out requests logging
+            lambda r: (not r.name.startswith("requests")) or r.levelno > logging.INFO
         )
+        handler.addFilter(lambda r: r.levelno >= conf_level)
 
         handlers.append(handler)
 
     logging.basicConfig(level=min(console_level, conf_level), handlers=handlers)
-    print("-- console logging level: {}".format(console_level))
+    l.log(logging.ERROR + 1,
+          "application started; console logging level: {}; file logging level: {}",
+          console_level,
+          conf_level if conf.logging.active else "disabled")
 
 
 ###############################################################################

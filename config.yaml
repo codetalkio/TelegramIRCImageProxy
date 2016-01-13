@@ -27,6 +27,6 @@ irc:
   auth_timeout: 5:00
 logging:
   active: true
-  path: errors.log
+  path: log
   level: INFO
 ...
