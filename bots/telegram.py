@@ -17,10 +17,11 @@ l = logging.getLogger(__name__)
 class TelegramImageBot(botapi.TelegramBot):
     _command_handlers = defaultdict(list)
 
-    def __init__(self, conf, on_image=None, *args, **kwargs):
+    def __init__(self, conf, user_db, on_image=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._offset = None
         self.conf = conf
+        self.user_db = user_db
         self.on_image = on_image
 
     # @command('cmdname') decorator
@@ -180,3 +181,20 @@ def cmd_auth(self, args, message):
 def cmd_get_id(self, args, message):
     """/get_id"""
     return message.sender.id
+
+
+@TelegramImageBot.command('blacklist', True)
+def cmd_blacklist(self, args, message):
+    """/blacklist [add | remove] <id>"""
+    funcs = dict(
+        add=self.user_db.add_to_blacklist,
+        remove=self.user_db.remove_from_blacklist
+    )
+    if not (len(args) == 2 and args[0].lower() in funcs and args[1].isdigit()):
+        return ("Invalid arguments; expected an action and a user ID.\n"
+                "Command signature: {}".format(cmd_blacklist.__doc__))
+
+    if funcs[args[0].lower()](int(args[1])):
+        return "Blacklist changed."
+    else:
+        return "Blacklist operation failed."
