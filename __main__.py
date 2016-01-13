@@ -76,7 +76,7 @@ def init_logging(conf, console_level):
         handlers.append(handler)
 
     logging.basicConfig(level=min(console_level, conf_level), handlers=handlers)
-    print("-- console logging level: {}".format(l.getEffectiveLevel()))
+    print("-- console logging level: {}".format(console_level))
 
 
 ###############################################################################
