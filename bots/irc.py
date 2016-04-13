@@ -13,6 +13,11 @@ l = logging.getLogger(__name__)
 class IRCBot(asyncirc.IRCBot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if hasattr(self._socket, 'version'):  # ssl.SSLSocket; added in Py3.5
+            ssl_version = self._socket.version()
+            if ssl_version is None:
+                l.error("requested SSL/TLS connection, but none could be established")
+            l.debug("using SSL version {}", ssl_version)
 
         self._connected = False
         self.auth_map = {}

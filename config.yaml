@@ -20,7 +20,7 @@ storage:
 irc:
   host: # REQUIRED!
   port: 6667  # REQUIRED!
-  #ssl: true  # currently unsupported
+  ssl: false
   nick: # REQUIRED!
   password:
   channel: ''  # REQUIRED!

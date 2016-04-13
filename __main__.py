@@ -117,7 +117,7 @@ def main():
         nick=conf.irc.nick or "TelegramBot",
         realname=conf.irc.nick,
         password=conf.irc.password or None,
-        # use_ssl=conf.irc.ssl or False
+        use_ssl=conf.irc.ssl or False
     )
     irc_bot.start()
     if not irc_bot.wait_connected(conf.irc.timeout or 7):
