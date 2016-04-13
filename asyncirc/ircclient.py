@@ -99,11 +99,11 @@ class IRCClient(object):
                         try:
                             self._socket.send(msg.encode("UTF-8"))
                             self._out_queue.task_done()
-                        except BlockingIOError:
+                        except (BlockingIOError, ssl.SSLWantWriteError):
                             pass
                         else:
                             break
-                    logging.debug(msg)
+                    logging.debug("<- {!r}".format(msg))
             except queue.Empty as e:
                 pass
         logging.info("Send loop stopped")
@@ -124,11 +124,12 @@ class IRCClient(object):
                 if data:
                     for line in data:
                         self._process_data(line.decode(encoding='UTF-8', errors='ignore'))
-            except BlockingIOError as e:
+            except (BlockingIOError, ssl.SSLWantReadError) as e:
                 pass
         logging.info("Receive loop stopped")
 
     def _process_data(self, line):
+        logging.debug("-> {!r}".format(line))
         line = line.rstrip()
         line = line.split()
         if not line:
@@ -138,7 +139,6 @@ class IRCClient(object):
             self.send_raw('PONG {pong}'.format(pong=line[1]))
         else:
             self._in_queue.put(line)
-        logging.debug(' '.join(line))
 
     def start(self):
         self._socket.connect(self.host[4])

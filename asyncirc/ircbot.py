@@ -58,7 +58,6 @@ class IRCBot(IRCClient):
                 #These "msg"s will be raw irc received lines, which have several forms
                 # basically, we should be looking for
                 # :User!Name@host COMMAND <ARGS>
-                logging.debug(args)
                 userhost = user_re.search(args[0][1:])
 
                 if userhost:
@@ -116,7 +115,7 @@ class IRCBot(IRCClient):
                 self._in_queue.task_done()
             except queue.Empty as e: pass
             except Exception as e:
-                logging.debug(e.args)
+                logging.exception("Error while handling message " + str(args))
 
     def start(self):
         IRCClient.start(self)
