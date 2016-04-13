@@ -122,6 +122,7 @@ def main():
     irc_bot.start()
     if not irc_bot.wait_connected(conf.irc.timeout or 7):
         l.critical("couldn't connect to IRC")
+        irc_bot.stop()
         return 3
     l.info("connected to IRC")
     irc_bot.join(conf.irc.channel)
