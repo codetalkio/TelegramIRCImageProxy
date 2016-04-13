@@ -100,7 +100,7 @@ def main():
             console_level = getattr(logging, sys.argv[1].upper(), console_level)
     # Read config and init logging
     conf = config.read_file(CONFIG_FILE)
-    all_log_level = init_logging(conf=conf, console_level=logging.WARN)
+    all_log_level = init_logging(conf=conf, console_level=console_level)
     l.info("config: {!s}", conf)
 
     # Verify other config
