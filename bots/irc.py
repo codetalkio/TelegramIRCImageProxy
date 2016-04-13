@@ -39,10 +39,12 @@ class IRCBot(asyncirc.IRCBot):
             del self.auth_map[authcode]
 
     def on_msg_command(self, nick, host, channel, message):
-        _, _, text = message.partition(self.nick)
-        if not text:
+        words = message.split()
+        if len(words) < 2:
             return
-        _, command, *args = text.split(" ")  # also strips ": " after nick
+        target, command, *args = words
+        if target.rstrip(":") != self.nick:  # allow ":" after the nick
+            return
         l.debug("IRC command message from {0[nick]}: {0[command]} {0[args]}", locals())
         if command == 'auth':
             l.info("auth attempt on IRC from {0[nick]} with {0[args]}", locals())
