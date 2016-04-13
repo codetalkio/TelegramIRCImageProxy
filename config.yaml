@@ -6,6 +6,7 @@ telegram:
   token:  # REQUIRED! obtain from @BotFather (https://telegram.me/BotFather)
   admin: []  # List of Telegram IDs that are allowed to use admin commands
   timeout: 60
+  username_for_help: '@fichtefoll'  # Will be displayed in case of errors and in help message
 imgur:
   client_id:  # REQUIRED! obtain https://api.imgur.com/oauth2/addclient
   client_secret:  # REQUIRED!

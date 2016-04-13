@@ -87,8 +87,9 @@ class ImageHandler(BaseHandler):
                 self.img = self.img._replace(local_path=None)
 
         except Exception as e:
-            self.reply("Oops, there was an error. Contact @fichtefoll and run in circles.\n"
-                       "Error: " + str(e))
+            self.reply("Oops, there was an error. Contact {} and run in circles.\n"
+                       "Error: {}"
+                       .format(self.conf.telegram.username_for_help, e))
             l.exception("Uncaught exception in ImageHandler: {}", e)
 
         finally:

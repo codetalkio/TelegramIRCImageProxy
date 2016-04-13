@@ -172,6 +172,9 @@ def cmd_start(self, args, message):
         which I will upload
         and link to in the IRC channel
         {conf.irc.channel} on {conf.irc.host}.
+
+        Contact {conf.telegram.username_for_help}
+        in case you are having problems.
     """).format(conf=self.conf)
 
     if message.sender.id in (self.conf.telegram.admin or []):
