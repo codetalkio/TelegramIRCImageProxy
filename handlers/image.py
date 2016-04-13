@@ -160,7 +160,7 @@ class ImageHandler(BaseHandler):
         return True
 
     def post_to_irc(self):
-        pre_msg = ("<{{0.username}}>: {}{{0.url}}"
-                   .format("{0.caption} " if self.img.caption else ""))
+        pre_msg = ("<{{0.username}}> {{0.url}}{}"
+                   .format(" {0.caption}" if self.img.caption else ""))
         msg = pre_msg.format(self.img)
         self.irc_bot.msg(self.conf.irc.channel, msg)
