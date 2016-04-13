@@ -18,10 +18,11 @@ storage:
   database: images.db
   user_database: users.json
 irc:
-  nick: # REQUIRED!
   host: # REQUIRED!
   port: 6667  # REQUIRED!
   #ssl: true  # currently unsupported
+  nick: # REQUIRED!
+  password:
   channel: ''  # REQUIRED!
   timeout: 7
   auth_timeout: 5:00

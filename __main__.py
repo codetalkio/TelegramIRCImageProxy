@@ -116,6 +116,7 @@ def main():
         port=conf.irc.port or 6667,
         nick=conf.irc.nick or "TelegramBot",
         realname=conf.irc.nick,
+        password=conf.irc.password or None,
         # use_ssl=conf.irc.ssl or False
     )
     irc_bot.start()
