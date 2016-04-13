@@ -36,12 +36,12 @@ def verify_config(conf):
 
 
 def init_logging(conf, console_level):
-    CONSOLE_FMT = "| {levelname:^8} | {message} (from {name}; {threadName})"
-    FILE_FMT = "| {asctime} " + CONSOLE_FMT
+    console_fmt = "| {levelname:^8} | {message} (from {name}; {threadName})"
+    file_fmt = "| {asctime} " + console_fmt
     handlers = []
 
     class NewStyleLogRecord(logging.LogRecord):
-        def getMessage(self):
+        def getMessage(self):  # noqa
             msg = self.msg
             if not isinstance(self.msg, str):
                 msg = str(self.msg)
@@ -51,7 +51,7 @@ def init_logging(conf, console_level):
     logging.setLogRecordFactory(NewStyleLogRecord)
 
     handler = ColorStreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(CONSOLE_FMT, style='{'))
+    handler.setFormatter(logging.Formatter(console_fmt, style='{'))
     handler.addFilter(
         # Filter out requests logging
         lambda r: (not r.name.startswith("requests")) or r.levelno > logging.INFO
@@ -66,7 +66,7 @@ def init_logging(conf, console_level):
 
         handler = logging.handlers.TimedRotatingFileHandler(conf.logging.path or "log",
                                                             **conf.logging.rotate)
-        handler.setFormatter(logging.Formatter(FILE_FMT, style='{'))
+        handler.setFormatter(logging.Formatter(file_fmt, style='{'))
         handler.addFilter(
             # Filter out requests logging
             lambda r: (not r.name.startswith("requests")) or r.levelno > logging.INFO
