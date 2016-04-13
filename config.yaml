@@ -18,11 +18,11 @@ storage:
   database: images.db
   user_database: users.json
 irc:
-  nick: TelegramBot  # REQUIRED!
-  host: irc.codetalk.io  # REQUIRED!
+  nick: # REQUIRED!
+  host: # REQUIRED!
   port: 6667  # REQUIRED!
   #ssl: true  # currently unsupported
-  channel: '#lobby'  # REQUIRED!
+  channel: ''  # REQUIRED!
   timeout: 7
   auth_timeout: 5:00
 logging:
