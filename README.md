@@ -6,13 +6,6 @@ uploads them to <http://imgur.com>
 and posts the URL to an IRC channel.
 Intended for quickly sharing images from mobile phones.
 
-Reference configuration: 
-Send photos or image files to https://telegram.me/codetalkircbot
-and they will be posted 
-in [#lobby on irc.codetalk.io](irc://irc.codetalk.io/lobby).
-You need to authenticate before however.
-
-
 ## Installation
 
 ```
