@@ -13,6 +13,10 @@ if sys.hexversion < 0x03000000:
 else:
     import queue
 
+
+logger = logging.getLogger(__name__)
+
+
 class IRCClient(object):
     """Provides real-time multithreaded IRC Client communication
 
@@ -88,7 +92,7 @@ class IRCClient(object):
 
 
     def _async_send(self):
-        logging.info("Send loop started")
+        logger.info("Send loop started")
         while not self._stop_event.is_set():
             time.sleep(0.01)
             try:
@@ -103,16 +107,16 @@ class IRCClient(object):
                             pass
                         else:
                             break
-                    logging.debug("<- {!r}".format(msg))
+                    logger.debug("<- {!r}".format(msg))
             except queue.Empty as e:
                 pass
-        logging.info("Send loop stopped")
+        logger.info("Send loop stopped")
 
     def _async_recv(self):
         """No raw bytes should escape from this, all byte encoding and
         decoding should be handling inside this function"""
 
-        logging.info("Receive loop started")
+        logger.info("Receive loop started")
         recbuffer = b""
 
         while not self._stop_event.is_set():
@@ -126,10 +130,10 @@ class IRCClient(object):
                         self._process_data(line.decode(encoding='UTF-8', errors='ignore'))
             except (BlockingIOError, ssl.SSLWantReadError) as e:
                 pass
-        logging.info("Receive loop stopped")
+        logger.info("Receive loop stopped")
 
     def _process_data(self, line):
-        logging.debug("-> {!r}".format(line))
+        logger.debug("-> {!r}".format(line))
         line = line.rstrip()
         line = line.split()
         if not line:

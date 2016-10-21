@@ -19,8 +19,13 @@ else:
 
 from .ircclient import IRCClient
 
+
+logger = logging.getLogger(__name__)
+
+
 #Somewhat complex regex that accurately matches nick!username@host, with named groups for easy parsing and usage
 user_re = re.compile(r'(?P<nick>[\w\d<-\[\]\^\{\}\~]+)!(?P<user>[\w\d<-\[\]\^\{\}\~]+)@(?P<host>.+)')
+
 
 class IRCBot(IRCClient):
     '''See `IRCClient` for basic client usage, here is usage for the bot system
@@ -110,12 +115,12 @@ class IRCBot(IRCClient):
                         for handler in self._handlers['notice']:
                             handler(self, nick, host, channel, message)
                     else:
-                        logging.warning("Unhandled command %s" % command)
+                        logger.warning("Unhandled command %s" % command)
 
                 self._in_queue.task_done()
             except queue.Empty as e: pass
             except Exception as e:
-                logging.exception("Error while handling message " + str(args))
+                logger.exception("Error while handling message " + str(args))
 
     def start(self):
         IRCClient.start(self)
