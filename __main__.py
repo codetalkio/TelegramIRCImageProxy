@@ -33,12 +33,13 @@ def verify_config(conf):
 
     else:
         return True
+    return False
 
 
 def init_logging(conf, console_level):
     console_fmt = "| {levelname:^8} | {message} (from {name}; {threadName})"
     file_fmt = "| {asctime} " + console_fmt
-    handlers = []
+    asyncirc_logger = logging.getLogger("asyncirc")
 
     class NewStyleLogRecord(logging.LogRecord):
         def getMessage(self):  # noqa
@@ -52,13 +53,10 @@ def init_logging(conf, console_level):
 
     handler = ColorStreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter(console_fmt, style='{'))
-    handler.addFilter(
-        # Filter out requests logging
-        lambda r: (not r.name.startswith("requests")) or r.levelno > logging.INFO
-    )
     handler.addFilter(lambda r: r.levelno >= console_level)
 
-    handlers.append(handler)
+    l.addHandler(handler)
+    asyncirc_logger.addHandler(handler)
 
     conf_level = console_level
     if conf.logging.active:
@@ -67,24 +65,23 @@ def init_logging(conf, console_level):
         handler = logging.handlers.TimedRotatingFileHandler(conf.logging.path or "log",
                                                             **conf.logging.rotate)
         handler.setFormatter(logging.Formatter(file_fmt, style='{'))
-        handler.addFilter(
-            # Filter out requests logging
-            lambda r: (not r.name.startswith("requests")) or r.levelno > logging.INFO
-        )
         handler.addFilter(lambda r: r.levelno >= conf_level)
 
-        handlers.append(handler)
+        l.addHandler(handler)
+        asyncirc_logger.addHandler(handler)
 
-    logging.basicConfig(level=min(console_level, conf_level), handlers=handlers)
-    all_log_level = max(console_level, conf_level) + 1
+    min_level = min(console_level, conf_level)
+    max_level = max(console_level, conf_level)
+    l.setLevel(min_level)
+    asyncirc_logger.setLevel(min_level)
 
-    l.log(all_log_level,
+    l.log(max_level,
           "application started; console logging level: {}; file logging level: {}",
           console_level,
           conf_level if conf.logging.active else "disabled")
 
     # return minimum level required to pass all filters
-    return all_log_level
+    return max_level
 
 
 ###############################################################################
