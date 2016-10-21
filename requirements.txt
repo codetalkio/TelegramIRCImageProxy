@@ -1,6 +1,6 @@
 AsyncIRC==0.0.3
 imgurpython==1.1.6
-PyYAML==3.11
+PyYAML==3.12
 requests==2.8.1
 twx.botapi==2.0.1
 wheel==0.24.0
